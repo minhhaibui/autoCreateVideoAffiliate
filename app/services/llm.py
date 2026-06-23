@@ -38,6 +38,59 @@ Generate a script for a video, depending on the subject of the video.
 """.strip()
 
 
+# Specialized system prompt for TikTok affiliate / product-promotion videos.
+# It reuses the same hard output constraints as the default prompt (plain
+# spoken text, no markdown, same language as the subject) but steers the model
+# toward a hook → benefits → call-to-action structure that converts viewers
+# into buyers, while explicitly forbidding fabricated prices/stats so the
+# output stays compliant with affiliate advertising rules.
+TIKTOK_AFFILIATE_SCRIPT_SYSTEM_PROMPT = """
+# Role: TikTok Affiliate Video Script Writer
+
+## Goals:
+Write a short, high-converting spoken script for a TikTok affiliate video that
+promotes the product or topic given as the video subject and makes viewers want
+to buy it through the affiliate link.
+
+## Script flow (weave these into one smooth narration, never label the parts):
+1. Hook: open with a scroll-stopping first line within the first 3 seconds - a
+   bold claim, a relatable problem, or a surprising benefit.
+2. Problem or desire: name the pain point or desire the product addresses.
+3. Benefits: give two or three concrete, specific benefits framed as outcomes
+   the viewer will get.
+4. Light proof or urgency: hint that it is popular or a limited deal, WITHOUT
+   inventing exact numbers, prices, or statistics.
+5. Call to action: end by telling viewers to tap the product link or cart and
+   buy it now.
+
+## Constrains:
+1. return the script as a single block of plain spoken text with the specified number of paragraphs.
+2. use a spoken, energetic, conversational tone with short, punchy sentences that are easy to read aloud and fit on subtitles.
+3. do not include any markdown, titles, emojis, hashtags, bullet points, or section labels.
+4. do not include "voiceover", "narrator", stage directions, or similar indicators.
+5. do not invent fake prices, fake discounts, exact statistics, or unverifiable medical or financial claims.
+6. do not under any circumstance reference this prompt or the script itself.
+7. only return the raw spoken content of the script.
+8. respond in the same language as the video subject.
+""".strip()
+
+
+# Selectable script "styles" surfaced in the WebUI. A value of "" means use the
+# default system prompt; any other value is passed through as a custom system
+# prompt to build_script_prompt(), which still appends the runtime context
+# (subject, language, paragraph count) for us.
+SCRIPT_STYLE_PRESETS = {
+    "default": "",
+    "tiktok_affiliate": TIKTOK_AFFILIATE_SCRIPT_SYSTEM_PROMPT,
+}
+
+
+def get_script_style_system_prompt(style_key: str) -> str:
+    """Return the system prompt for a named script style, or "" for the default
+    style / any unknown key (callers then fall back to DEFAULT_SCRIPT_SYSTEM_PROMPT)."""
+    return SCRIPT_STYLE_PRESETS.get(style_key or "default", "")
+
+
 def _normalize_text_response(content, llm_provider: str) -> str:
     # 不同 LLM SDK 在异常或被拦截场景下，可能返回 None、空字符串，
     # 甚至返回非字符串对象。这里统一做兜底校验，避免后续直接调用
@@ -1024,6 +1077,260 @@ def generate_social_metadata(
 
     logger.warning("falling back to heuristic social metadata")
     return _fallback_social_metadata(video_subject, video_script, platform)
+
+
+# =============================================================================
+# TikTok affiliate product idea finder
+#
+# 用现有 LLM provider 给出"适合做 TikTok 带货短视频"的选题建议。注意：这是
+# 模型基于通用电商趋势的启发式建议，并非实时真实销量数据。不接入任何外部
+# 数据源，也不影响视频生成主链路。
+# =============================================================================
+
+DEFAULT_PRODUCT_IDEA_COUNT = 6
+MAX_PRODUCT_IDEA_COUNT = 12
+MAX_PRODUCT_FIELD_LENGTH = 200
+PRODUCT_IDEA_KEYS = ("product", "category", "reason", "audience", "angle")
+
+
+def _normalize_product_idea_count(amount) -> int:
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return DEFAULT_PRODUCT_IDEA_COUNT
+    return max(1, min(MAX_PRODUCT_IDEA_COUNT, amount))
+
+
+def _coerce_product_idea(item) -> dict:
+    """Normalize one LLM-returned idea into the fixed {key: str} shape, dropping
+    items that are not dicts or have no product name."""
+    if not isinstance(item, dict):
+        return {}
+    idea = {}
+    for key in PRODUCT_IDEA_KEYS:
+        value = item.get(key, "")
+        idea[key] = _clamp_text(value, MAX_PRODUCT_FIELD_LENGTH)
+    if not idea["product"]:
+        return {}
+    return idea
+
+
+def generate_product_ideas(
+    category: str = "",
+    market: str = "",
+    language: str = "",
+    amount: int = DEFAULT_PRODUCT_IDEA_COUNT,
+) -> List[dict]:
+    """Suggest TikTok-affiliate product/niche ideas.
+
+    Returns a list of dicts with the keys in PRODUCT_IDEA_KEYS. These are
+    AI-generated suggestions from general short-video commerce trends, NOT
+    real-time sales data. On repeated failure an empty list is returned so the
+    caller can show a friendly message rather than crash.
+    """
+    amount = _normalize_product_idea_count(amount)
+    category = _limit_social_text(category, MAX_SOCIAL_SUBJECT_LENGTH, "category")
+    market = _limit_social_text(market, MAX_SOCIAL_SUBJECT_LENGTH, "market")
+    language = (language or "").strip()
+
+    category_line = (
+        f"Focus on this product category / niche: {category}."
+        if category
+        else "Cover a diverse mix of categories that are popular for TikTok affiliate selling."
+    )
+    market_line = f"Target market / region: {market}." if market else ""
+    language_line = (
+        f'Write every text field ("product", "category", "reason", "audience", "angle") in this language: {language}.'
+        if language
+        else "Write every text field in clear, simple language matching the category."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Product Idea Generator
+
+## Goals:
+Suggest {amount} product ideas that tend to sell well for TikTok affiliate marketing and are easy to turn into a short promo video.
+
+## Important:
+1. these are AI suggestions based on general TikTok / short-video commerce trends, not real-time sales numbers.
+2. prefer affordable, visually demonstrable, impulse-buy friendly products that perform well in short videos.
+3. avoid restricted or risky categories (weapons, drugs, adult products, medical or financial guarantees, counterfeits).
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "product", "category", "reason", "audience", "angle".
+   - "product": a specific product type, short.
+   - "category": the niche or category it belongs to.
+   - "reason": one short sentence on why it sells well on TikTok.
+   - "audience": who typically buys it.
+   - "angle": a short video hook or content angle idea.
+3. {language_line}
+4. {category_line}
+{("5. " + market_line) if market_line else ""}
+
+## Output Example:
+[{{"product": "...", "category": "...", "reason": "...", "audience": "...", "angle": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating product ideas: category={category!r}, market={market!r}, amount={amount}"
+    )
+
+    ideas: List[dict] = []
+    response = ""
+    for i in range(_max_retries):
+        try:
+            response = _generate_response(prompt)
+            if isinstance(response, str) and "Error: " in response:
+                logger.error(f"failed to generate product ideas: {response}")
+                break
+            raw = json.loads(response)
+        except Exception as e:
+            logger.warning(f"failed to parse product ideas: {str(e)}")
+            raw = None
+            if response:
+                match = re.search(r"\[.*]", response, re.DOTALL)
+                if match:
+                    try:
+                        raw = json.loads(match.group())
+                    except Exception as e:
+                        logger.warning(f"failed to parse product ideas json: {str(e)}")
+
+        if isinstance(raw, list):
+            ideas = [idea for idea in (_coerce_product_idea(x) for x in raw) if idea]
+
+        if ideas:
+            break
+        if i < _max_retries - 1:
+            logger.warning(f"failed to generate product ideas, trying again... {i + 1}")
+
+    logger.success(f"completed: {len(ideas)} product ideas")
+    return ideas[:amount]
+
+
+# =============================================================================
+# TikTok affiliate hook generator
+#
+# 为一个视频主题生成多条"前 3 秒"的开场钩子（hook）。带货短视频的完播率几乎
+# 完全取决于开头是否抓人，所以让用户一次拿到多条可 A/B 测试的开场白很有价值。
+# 复用现有 LLM provider，不接入外部数据，也不影响视频生成主链路。
+# =============================================================================
+
+DEFAULT_HOOK_COUNT = 5
+MAX_HOOK_COUNT = 10
+MAX_HOOK_LENGTH = 200
+
+
+def _normalize_hook_count(amount) -> int:
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return DEFAULT_HOOK_COUNT
+    return max(1, min(MAX_HOOK_COUNT, amount))
+
+
+def _coerce_hook(item) -> str:
+    """Normalize one LLM-returned hook into a clean single-line string, stripping
+    leading list markers / numbering / surrounding quotes the model often adds."""
+    if not isinstance(item, str):
+        return ""
+    hook = item.strip()
+    # Drop a leading "1." / "1)" / "-" / "*" / "•" bullet or numbering.
+    hook = re.sub(r'^\s*(?:\d+[.)]|[-*•])\s*', "", hook)
+    # Drop matching wrapping quotes.
+    if len(hook) >= 2 and hook[0] in "\"'“”" and hook[-1] in "\"'“”":
+        hook = hook[1:-1].strip()
+    return _clamp_text(hook, MAX_HOOK_LENGTH)
+
+
+def generate_hook_variations(
+    video_subject: str,
+    language: str = "",
+    amount: int = DEFAULT_HOOK_COUNT,
+) -> List[str]:
+    """Generate several scroll-stopping opening hook lines for a TikTok affiliate
+    video about ``video_subject``.
+
+    A hook is the first spoken line (first ~3 seconds) that stops the scroll.
+    Returns a de-duplicated list of plain-text hook strings. On repeated failure
+    an empty list is returned so the caller can show a friendly message rather
+    than crash.
+    """
+    amount = _normalize_hook_count(amount)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f"Write every hook in this language: {language}."
+        if language
+        else "Write every hook in the same language as the video subject."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Hook Writer
+
+## Goals:
+Write {amount} different scroll-stopping opening lines (hooks) for a short TikTok affiliate video about this subject: "{video_subject}".
+
+## What makes a good hook:
+1. it is the very first thing said, designed to stop the scroll within 3 seconds.
+2. use proven angles: a bold claim, a relatable problem, curiosity, a surprising result, or a "stop doing X" pattern interrupt.
+3. keep each hook to one short spoken sentence that is easy to read aloud and fits on a subtitle.
+
+## Constrains:
+1. return ONLY a json-array of strings. do not return any text before or after the json.
+2. each array element is one hook, as plain spoken text.
+3. do not include numbering, quotes, markdown, emojis, hashtags, or stage directions.
+4. do not invent fake prices, fake discounts, or unverifiable statistics.
+5. make the {amount} hooks clearly different from each other in angle and wording.
+6. {language_line}
+
+## Output Example:
+["Stop scrolling if your ... keeps ...", "I wish someone told me this sooner ...", "..."]
+""".strip()
+
+    logger.info(
+        f"generating hooks: subject={video_subject!r}, amount={amount}, language={language!r}"
+    )
+
+    hooks: List[str] = []
+    response = ""
+    for i in range(_max_retries):
+        try:
+            response = _generate_response(prompt)
+            if isinstance(response, str) and "Error: " in response:
+                logger.error(f"failed to generate hooks: {response}")
+                break
+            raw = json.loads(response)
+        except Exception as e:
+            logger.warning(f"failed to parse hooks: {str(e)}")
+            raw = None
+            if response:
+                match = re.search(r"\[.*]", response, re.DOTALL)
+                if match:
+                    try:
+                        raw = json.loads(match.group())
+                    except Exception as e:
+                        logger.warning(f"failed to parse hooks json: {str(e)}")
+
+        if isinstance(raw, list):
+            seen = set()
+            for x in raw:
+                hook = _coerce_hook(x)
+                key = hook.lower()
+                if hook and key not in seen:
+                    seen.add(key)
+                    hooks.append(hook)
+
+        if hooks:
+            break
+        if i < _max_retries - 1:
+            logger.warning(f"failed to generate hooks, trying again... {i + 1}")
+
+    logger.success(f"completed: {len(hooks)} hooks")
+    return hooks[:amount]
 
 
 if __name__ == "__main__":

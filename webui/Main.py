@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 import requests
 import streamlit as st
 from loguru import logger
+from PIL import Image, ImageDraw, ImageFont
 
 # Add the root directory of the project to the system path to allow importing modules from the project
 root_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -128,6 +129,133 @@ def get_all_fonts():
                 fonts.append(file)
     fonts.sort()
     return fonts
+
+
+# Fonts that correctly render a given language's glyphs/diacritics.
+# Generic CJK fonts (e.g. MicrosoftYaHei) do not render Vietnamese tone
+# marks reliably, so prefer a Vietnamese-designed font for vi content.
+_RECOMMENDED_FONTS_BY_LANG = {
+    "vi": ["BeVietnamPro-Bold.ttf", "UTM Kabel KT.ttf"],
+    "zh": ["MicrosoftYaHeiBold.ttc", "STHeitiMedium.ttc"],
+}
+
+
+def get_recommended_font(language_code, available_fonts):
+    """Return the best-fit subtitle font for a language, falling back to the
+    first available font when no preferred font is installed.
+
+    language_code may be a UI code ("vi") or a locale ("vi-VN"); only the
+    leading language part is used for matching.
+    """
+    lang = (language_code or "").split("-")[0].lower()
+    for preferred in _RECOMMENDED_FONTS_BY_LANG.get(lang, []):
+        if preferred in available_fonts:
+            return preferred
+    if "MicrosoftYaHeiBold.ttc" in available_fonts:
+        return "MicrosoftYaHeiBold.ttc"
+    return available_fonts[0] if available_fonts else "MicrosoftYaHeiBold.ttc"
+
+
+def _preview_hex_to_rgb(color):
+    """Parse a #RRGGBB string to an (r, g, b) tuple, falling back to black for
+    malformed values so the preview never raises mid-render."""
+    if isinstance(color, str) and color.startswith("#") and len(color) == 7:
+        try:
+            return (
+                int(color[1:3], 16),
+                int(color[3:5], 16),
+                int(color[5:7], 16),
+            )
+        except ValueError:
+            pass
+    return (0, 0, 0)
+
+
+def render_subtitle_preview(
+    font_name,
+    font_size,
+    text_fore_color,
+    stroke_color,
+    stroke_width,
+    background_color,
+    rounded_background,
+    sample_text,
+):
+    """Render a still image that mimics how a subtitle line will look in the
+    final video, so the user can confirm the font, colours, stroke and
+    background (and especially Vietnamese diacritics) before generating.
+
+    The geometry mirrors app/services/video.create_text_clip: a 1080px-wide
+    reference frame is assumed and font/stroke are scaled down to the preview
+    canvas, giving a faithful relative size. background_color of None / False
+    means no subtitle background.
+    """
+    canvas_w = 720
+    # Subtitle font sizes in the pipeline are absolute pixels on a ~1080px-wide
+    # frame; scale them to the preview canvas to preserve relative proportions.
+    scale = canvas_w / 1080.0
+    pv_font_size = max(14, int(round(font_size * scale)))
+    pv_stroke = max(0, int(round((stroke_width or 0) * scale)))
+    spacing = int(pv_font_size * 0.25)
+
+    font_path = os.path.join(font_dir, font_name) if font_name else ""
+    try:
+        font = ImageFont.truetype(font_path, pv_font_size)
+    except Exception as exc:  # missing/corrupt font file
+        logger.warning(f"subtitle preview: failed to load font {font_path}: {exc}")
+        font = ImageFont.load_default()
+
+    measure = ImageDraw.Draw(Image.new("RGB", (canvas_w, 10)))
+    bbox = measure.multiline_textbbox(
+        (0, 0),
+        sample_text,
+        font=font,
+        align="center",
+        spacing=spacing,
+        stroke_width=pv_stroke,
+    )
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    pad_x = int(pv_font_size * 0.6)
+    pad_y = int(pv_font_size * 0.4)
+    canvas_h = text_h + pad_y * 2 + int(pv_font_size * 1.4)
+
+    # Mid-grey stand-in for a video frame so both light and dark subtitle
+    # colours stay visible; a subtle checker hints "this is a placeholder".
+    img = Image.new("RGB", (canvas_w, canvas_h), (64, 64, 64))
+    draw = ImageDraw.Draw(img, "RGBA")
+    tile = 36
+    for ty in range(0, canvas_h, tile):
+        for tx in range(0, canvas_w, tile):
+            if (tx // tile + ty // tile) % 2 == 0:
+                draw.rectangle([tx, ty, tx + tile, ty + tile], fill=(74, 74, 74))
+
+    cx, cy = canvas_w // 2, canvas_h // 2
+    has_bg = bool(background_color) and isinstance(background_color, str)
+    if has_bg:
+        box_w = text_w + pad_x * 2
+        box_h = text_h + pad_y * 2
+        x0, y0 = cx - box_w // 2, cy - box_h // 2
+        rgb = _preview_hex_to_rgb(background_color)
+        radius = int(pv_font_size * 0.4) if rounded_background else 0
+        draw.rounded_rectangle(
+            [x0, y0, x0 + box_w, y0 + box_h],
+            radius=radius,
+            fill=(rgb[0], rgb[1], rgb[2], 140),
+        )
+
+    draw.multiline_text(
+        (cx, cy),
+        sample_text,
+        font=font,
+        fill=text_fore_color,
+        anchor="mm",
+        align="center",
+        spacing=spacing,
+        stroke_width=pv_stroke,
+        stroke_fill=stroke_color,
+    )
+    return img
 
 
 def get_all_songs():
@@ -672,6 +800,64 @@ uploaded_files = []
 uploaded_audio_file = None
 
 with left_panel:
+    # AI product-idea finder for TikTok affiliate. Rendered before the script
+    # settings so a "use as subject" click can populate the video_subject widget
+    # on the next rerun without a session-state/widget conflict.
+    with st.container(border=True):
+        st.write(tr("Affiliate Product Ideas"))
+        st.caption(tr("Affiliate Product Ideas Hint"))
+        idea_cols = st.columns([0.55, 0.45])
+        with idea_cols[0]:
+            idea_category = st.text_input(
+                tr("Product Category"),
+                placeholder=tr("Product Category Placeholder"),
+                key="product_idea_category",
+            ).strip()
+        with idea_cols[1]:
+            idea_market = st.text_input(
+                tr("Target Market"),
+                value="Vietnam",
+                key="product_idea_market",
+            ).strip()
+        idea_amount = st.slider(
+            tr("Number of Ideas"),
+            min_value=3,
+            max_value=llm.MAX_PRODUCT_IDEA_COUNT,
+            value=llm.DEFAULT_PRODUCT_IDEA_COUNT,
+            key="product_idea_amount",
+        )
+
+        if st.button(tr("Suggest Products"), key="auto_generate_product_ideas"):
+            with st.spinner(tr("Suggesting Products")):
+                st.session_state["product_ideas"] = llm.generate_product_ideas(
+                    category=idea_category,
+                    market=idea_market,
+                    language=st.session_state.get("ui_language", ""),
+                    amount=idea_amount,
+                )
+
+        product_ideas = st.session_state.get("product_ideas") or []
+        if product_ideas:
+            for i, idea in enumerate(product_ideas):
+                with st.expander(
+                    f"{i + 1}. {idea.get('product', '')}"
+                    + (f"  ·  {idea.get('category', '')}" if idea.get("category") else ""),
+                    expanded=(i == 0),
+                ):
+                    if idea.get("reason"):
+                        st.markdown(f"**{tr('Why it sells')}:** {idea['reason']}")
+                    if idea.get("audience"):
+                        st.markdown(f"**{tr('Audience')}:** {idea['audience']}")
+                    if idea.get("angle"):
+                        st.markdown(f"**{tr('Video Angle')}:** {idea['angle']}")
+                    if st.button(
+                        tr("Use as Subject"), key=f"use_product_idea_{i}"
+                    ):
+                        st.session_state["video_subject"] = idea.get("product", "")
+                        st.rerun()
+        elif "product_ideas" in st.session_state:
+            st.info(tr("No Product Ideas"))
+
     with st.container(border=True):
         st.write(tr("Video Script Settings"))
         params.video_subject = st.text_input(
@@ -697,6 +883,30 @@ with left_panel:
         )
         params.video_language = video_languages[selected_index][1]
 
+        # Script style presets. "TikTok Affiliate" swaps in a system prompt that
+        # writes hook → benefits → call-to-action product-promo scripts aimed at
+        # converting viewers into buyers via the affiliate link.
+        script_styles = [
+            (tr("Script Style Standard"), "default"),
+            (tr("Script Style TikTok Affiliate"), "tiktok_affiliate"),
+        ]
+        saved_script_style = config.ui.get("script_style", "default")
+        script_style_index = 0
+        for i, (_, style_value) in enumerate(script_styles):
+            if style_value == saved_script_style:
+                script_style_index = i
+                break
+        selected_style_index = st.selectbox(
+            tr("Script Style"),
+            index=script_style_index,
+            options=range(len(script_styles)),
+            format_func=lambda x: script_styles[x][0],
+            help=tr("Script Style Help"),
+            key="script_style_select",
+        )
+        selected_script_style = script_styles[selected_style_index][1]
+        config.ui["script_style"] = selected_script_style
+
         with st.expander(tr("Advanced Script Settings"), expanded=False):
             params.paragraph_number = st.slider(
                 tr("Script Paragraph Number"),
@@ -720,6 +930,8 @@ with left_panel:
             )
 
             if use_custom_system_prompt:
+                # An explicit hand-written system prompt always wins over the
+                # selected style preset.
                 custom_system_prompt = st.text_area(
                     tr("Custom System Prompt"),
                     height=240,
@@ -728,7 +940,11 @@ with left_panel:
                 ).strip()
                 params.custom_system_prompt = custom_system_prompt
             else:
-                params.custom_system_prompt = ""
+                # Fall back to the chosen style preset (empty string for the
+                # default style, which lets llm use DEFAULT_SCRIPT_SYSTEM_PROMPT).
+                params.custom_system_prompt = llm.get_script_style_system_prompt(
+                    selected_script_style
+                )
 
         if st.button(
             tr("Generate Video Script and Keywords"), key="auto_generate_script"
@@ -767,6 +983,95 @@ with left_panel:
         params.video_terms = st.text_area(
             tr("Video Keywords"), value=st.session_state["video_terms"]
         )
+
+    # Hook generator. The first ~3 seconds decide a TikTok's watch-through rate,
+    # so let the user generate several A/B-testable opening lines for the current
+    # subject and copy the best one into the start of their script.
+    with st.container(border=True):
+        st.write(tr("Hook Ideas"))
+        st.caption(tr("Hook Ideas Hint"))
+        hook_amount = st.slider(
+            tr("Number of Hooks"),
+            min_value=3,
+            max_value=llm.MAX_HOOK_COUNT,
+            value=llm.DEFAULT_HOOK_COUNT,
+            key="hook_amount",
+        )
+        if st.button(tr("Generate Hooks"), key="auto_generate_hooks"):
+            if not params.video_subject:
+                st.error(tr("Please Enter the Video Subject"))
+            else:
+                with st.spinner(tr("Generating Hooks")):
+                    st.session_state["video_hooks"] = llm.generate_hook_variations(
+                        video_subject=params.video_subject,
+                        language=(
+                            params.video_language
+                            or st.session_state.get("ui_language", "")
+                        ),
+                        amount=hook_amount,
+                    )
+
+        video_hooks = st.session_state.get("video_hooks") or []
+        if video_hooks:
+            for i, hook in enumerate(video_hooks):
+                st.text_input(
+                    f"{tr('Hook')} {i + 1}",
+                    value=hook,
+                    key=f"video_hook_{i}",
+                )
+            st.caption(tr("Hook Copy Hint"))
+        elif "video_hooks" in st.session_state:
+            st.info(tr("No Hooks"))
+
+    # TikTok / short-video post caption helper. Reuses the existing
+    # llm.generate_social_metadata backend (already used by the REST API) so the
+    # WebUI user can produce a ready-to-paste title, caption and hashtags for
+    # affiliate posts without leaving the app.
+    with st.container(border=True):
+        st.write(tr("Social Post Caption"))
+        social_platforms = [
+            ("TikTok", "tiktok"),
+            ("YouTube Shorts", "youtube_shorts"),
+            ("Instagram Reels", "instagram_reels"),
+            ("Facebook Reels", "facebook_reels"),
+        ]
+        selected_social_index = st.selectbox(
+            tr("Publish Platform"),
+            index=0,
+            options=range(len(social_platforms)),
+            format_func=lambda x: social_platforms[x][0],
+            key="social_platform_select",
+        )
+        social_platform = social_platforms[selected_social_index][1]
+
+        if st.button(
+            tr("Generate Caption and Hashtags"), key="auto_generate_social"
+        ):
+            current_script = st.session_state.get("video_script", "")
+            if not params.video_subject and not current_script:
+                st.error(tr("Please Enter the Video Subject"))
+            else:
+                with st.spinner(tr("Generating Caption and Hashtags")):
+                    st.session_state["social_metadata"] = llm.generate_social_metadata(
+                        video_subject=params.video_subject,
+                        video_script=current_script,
+                        language=(params.video_language or llm.DEFAULT_SOCIAL_LANGUAGE),
+                        platform=social_platform,
+                    )
+
+        social_meta = st.session_state.get("social_metadata")
+        if social_meta:
+            # No widget keys here on purpose: value= is rebuilt from the latest
+            # generated metadata each rerun, so the fields always show the most
+            # recent result while staying selectable/copyable.
+            st.text_input(tr("Post Title"), value=social_meta.get("title", ""))
+            hashtags = " ".join(social_meta.get("hashtags", []) or [])
+            caption_body = social_meta.get("caption", "")
+            full_caption = (
+                f"{caption_body}\n\n{hashtags}" if hashtags else caption_body
+            )
+            st.text_area(tr("Caption"), value=full_caption, height=180)
+            st.caption(tr("Caption Copy Hint"))
 
 with middle_panel:
     with st.container(border=True):
@@ -1187,7 +1492,12 @@ with right_panel:
         st.write(tr("Subtitle Settings"))
         params.subtitle_enabled = st.checkbox(tr("Enable Subtitles"), value=True)
         font_names = get_all_fonts()
-        saved_font_name = config.ui.get("font_name", "MicrosoftYaHeiBold.ttc")
+        # Default to a font that renders the current UI language correctly
+        # (e.g. Vietnamese diacritics) when the user has no saved preference.
+        default_font_name = get_recommended_font(
+            st.session_state.get("ui_language", ""), font_names
+        )
+        saved_font_name = config.ui.get("font_name", default_font_name)
         saved_font_name_index = 0
         if saved_font_name in font_names:
             saved_font_name_index = font_names.index(saved_font_name)
@@ -1248,9 +1558,17 @@ with right_panel:
 
         stroke_cols = st.columns([0.3, 0.7])
         with stroke_cols[0]:
-            params.stroke_color = st.color_picker(tr("Stroke Color"), "#000000")
+            saved_stroke_color = config.ui.get("stroke_color", "#000000")
+            params.stroke_color = st.color_picker(
+                tr("Stroke Color"), saved_stroke_color
+            )
+            config.ui["stroke_color"] = params.stroke_color
         with stroke_cols[1]:
-            params.stroke_width = st.slider(tr("Stroke Width"), 0.0, 10.0, 1.5)
+            saved_stroke_width = config.ui.get("stroke_width", 1.5)
+            params.stroke_width = st.slider(
+                tr("Stroke Width"), 0.0, 10.0, saved_stroke_width
+            )
+            config.ui["stroke_width"] = params.stroke_width
 
         subtitle_bg_cols = st.columns([0.4, 0.6])
         saved_subtitle_background_enabled = config.ui.get(
@@ -1294,6 +1612,37 @@ with right_panel:
             config.ui["rounded_subtitle_background"] = (
                 params.rounded_subtitle_background
             )
+
+        # Live preview so the user can confirm the chosen font renders
+        # Vietnamese diacritics (and the colours/stroke/background look right)
+        # before committing to a full video render.
+        with st.expander(tr("Subtitle Preview"), expanded=True):
+            default_sample = "Tiếng Việt có dấu — 0123\nSiêu sale hôm nay!"
+            preview_text = st.text_area(
+                tr("Preview Text"),
+                value=default_sample,
+                height=68,
+                key="subtitle_preview_text",
+            )
+            preview_bg = (
+                config.ui.get("subtitle_background_color", "#000000")
+                if subtitle_background_enabled
+                else None
+            )
+            try:
+                preview_img = render_subtitle_preview(
+                    font_name=params.font_name,
+                    font_size=params.font_size,
+                    text_fore_color=params.text_fore_color,
+                    stroke_color=params.stroke_color,
+                    stroke_width=params.stroke_width,
+                    background_color=preview_bg,
+                    rounded_background=params.rounded_subtitle_background,
+                    sample_text=(preview_text or default_sample),
+                )
+                st.image(preview_img, use_container_width=True)
+            except Exception as exc:
+                st.warning(f"{tr('Subtitle Preview Failed')}: {exc}")
     with st.expander(tr("Click to show API Key management"), expanded=False):
         st.subheader(tr("Manage Pexels, Pixabay and Coverr API Keys"))
 
