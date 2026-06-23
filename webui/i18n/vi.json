@@ -195,6 +195,9 @@
     "Generating Hooks": "Đang tạo hook...",
     "Hook": "Hook",
     "Hook Copy Hint": "Bôi đen một hook để sao chép, rồi dán vào làm câu đầu tiên của kịch bản.",
-    "No Hooks": "Chưa tạo được hook. Hãy thử lại."
+    "No Hooks": "Chưa tạo được hook. Hãy thử lại.",
+    "Estimated Duration": "Thời lượng ước tính",
+    "words": "từ",
+    "TikTok Length Hint": "Nên để khoảng 15-45 giây để TikTok phân phối tốt nhất."
   }
 }

@@ -968,6 +968,17 @@ with left_panel:
         params.video_script = st.text_area(
             tr("Video Script"), value=st.session_state["video_script"], height=280
         )
+        # Rough length guide so creators can hit the ideal short-video duration.
+        # Reuses voice.estimate_no_voice_duration (language-aware speaking-rate
+        # model) at normal speed; actual TTS length varies with voice & rate.
+        script_for_estimate = (params.video_script or "").strip()
+        if script_for_estimate:
+            est_seconds = voice.estimate_no_voice_duration(script_for_estimate)
+            word_count = len(script_for_estimate.split())
+            st.caption(
+                f"⏱️ {tr('Estimated Duration')}: ~{est_seconds:.0f}s · "
+                f"{word_count} {tr('words')}. {tr('TikTok Length Hint')}"
+            )
         if st.button(tr("Generate Video Keywords"), key="auto_generate_terms"):
             if not params.video_script:
                 st.error(tr("Please Enter the Video Subject"))

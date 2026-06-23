@@ -195,6 +195,9 @@
     "Generating Hooks": "Generating hooks...",
     "Hook": "Hook",
     "Hook Copy Hint": "Select a hook to copy it, then paste it as the first line of your script.",
-    "No Hooks": "No hooks generated. Try again."
+    "No Hooks": "No hooks generated. Try again.",
+    "Estimated Duration": "Estimated length",
+    "words": "words",
+    "TikTok Length Hint": "Aim for ~15-45s for best TikTok reach."
   }
 }
