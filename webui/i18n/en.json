@@ -198,6 +198,12 @@
     "No Hooks": "No hooks generated. Try again.",
     "Estimated Duration": "Estimated length",
     "words": "words",
-    "TikTok Length Hint": "Aim for ~15-45s for best TikTok reach."
+    "TikTok Length Hint": "Aim for ~15-45s for best TikTok reach.",
+    "Export Copy": "Export Copy",
+    "Export Copy Hint": "Bundle the subject, hooks, script, keywords, caption and hashtags into one text file to archive or reuse.",
+    "Hashtags": "Hashtags",
+    "Download Copy": "Download as .txt",
+    "Preview Copy": "Preview",
+    "Nothing to Export": "Nothing to export yet. Generate a script, hooks or caption first."
   }
 }

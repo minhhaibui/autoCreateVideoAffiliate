@@ -258,6 +258,37 @@ def render_subtitle_preview(
     return img
 
 
+def build_affiliate_package_text(
+    subject, script, keywords, hooks, social_meta, label
+):
+    """Assemble all generated affiliate assets into one plain-text document the
+    user can download/keep. ``label`` maps section keys to translated headings so
+    the export follows the current UI language. Empty sections are skipped."""
+    lines = []
+
+    def section(title, body):
+        body = (body or "").strip()
+        if body:
+            lines.append(f"## {title}")
+            lines.append(body)
+            lines.append("")
+
+    section(label("subject"), subject)
+    if hooks:
+        numbered = "\n".join(f"{i + 1}. {h}" for i, h in enumerate(hooks))
+        section(label("hooks"), numbered)
+    section(label("script"), script)
+    section(label("keywords"), keywords)
+
+    if social_meta:
+        section(label("title"), social_meta.get("title", ""))
+        section(label("caption"), social_meta.get("caption", ""))
+        hashtags = " ".join(social_meta.get("hashtags", []) or [])
+        section(label("hashtags"), hashtags)
+
+    return "\n".join(lines).strip() + "\n"
+
+
 def get_all_songs():
     songs = []
     for root, dirs, files in os.walk(song_dir):
@@ -1083,6 +1114,48 @@ with left_panel:
             )
             st.text_area(tr("Caption"), value=full_caption, height=180)
             st.caption(tr("Caption Copy Hint"))
+
+    # Export helper: bundle every generated asset (subject, hooks, script,
+    # keywords, caption, hashtags) into one text file so creators can archive
+    # their copy or move it into a publishing tool in a single click.
+    with st.container(border=True):
+        st.write(tr("Export Copy"))
+        st.caption(tr("Export Copy Hint"))
+        _section_labels = {
+            "subject": tr("Video Subject"),
+            "hooks": tr("Hook Ideas"),
+            "script": tr("Video Script"),
+            "keywords": tr("Video Keywords"),
+            "title": tr("Post Title"),
+            "caption": tr("Caption"),
+            "hashtags": tr("Hashtags"),
+        }
+        package_text = build_affiliate_package_text(
+            subject=params.video_subject,
+            script=st.session_state.get("video_script", ""),
+            keywords=st.session_state.get("video_terms", ""),
+            hooks=st.session_state.get("video_hooks") or [],
+            social_meta=st.session_state.get("social_metadata"),
+            label=lambda key: _section_labels.get(key, key),
+        )
+        has_content = bool(package_text.strip())
+        if has_content:
+            st.download_button(
+                tr("Download Copy"),
+                data=package_text.encode("utf-8"),
+                file_name="affiliate_copy.txt",
+                mime="text/plain",
+                key="download_affiliate_copy",
+            )
+            with st.expander(tr("Preview Copy"), expanded=False):
+                st.text_area(
+                    tr("Export Copy"),
+                    value=package_text,
+                    height=240,
+                    label_visibility="collapsed",
+                )
+        else:
+            st.info(tr("Nothing to Export"))
 
 with middle_panel:
     with st.container(border=True):

@@ -198,6 +198,12 @@
     "No Hooks": "Chưa tạo được hook. Hãy thử lại.",
     "Estimated Duration": "Thời lượng ước tính",
     "words": "từ",
-    "TikTok Length Hint": "Nên để khoảng 15-45 giây để TikTok phân phối tốt nhất."
+    "TikTok Length Hint": "Nên để khoảng 15-45 giây để TikTok phân phối tốt nhất.",
+    "Export Copy": "Xuất Nội Dung",
+    "Export Copy Hint": "Gộp chủ đề, hook, kịch bản, từ khóa, caption và hashtag vào một file text để lưu trữ hoặc dùng lại.",
+    "Hashtags": "Hashtag",
+    "Download Copy": "Tải về dạng .txt",
+    "Preview Copy": "Xem trước",
+    "Nothing to Export": "Chưa có gì để xuất. Hãy tạo kịch bản, hook hoặc caption trước."
   }
 }
