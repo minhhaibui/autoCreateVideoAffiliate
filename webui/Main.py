@@ -1056,12 +1056,25 @@ with left_panel:
         video_hooks = st.session_state.get("video_hooks") or []
         if video_hooks:
             for i, hook in enumerate(video_hooks):
-                st.text_input(
-                    f"{tr('Hook')} {i + 1}",
-                    value=hook,
-                    key=f"video_hook_{i}",
-                )
-            st.caption(tr("Hook Copy Hint"))
+                hook_cols = st.columns([0.78, 0.22])
+                with hook_cols[0]:
+                    st.text_input(
+                        f"{tr('Hook')} {i + 1}",
+                        value=hook,
+                        key=f"video_hook_{i}",
+                    )
+                with hook_cols[1]:
+                    # Vertical spacer so the button lines up with the input box
+                    # below its label.
+                    st.write("")
+                    st.write("")
+                    if st.button(tr("Use Hook"), key=f"use_hook_{i}"):
+                        existing = (st.session_state.get("video_script") or "").strip()
+                        st.session_state["video_script"] = (
+                            f"{hook}\n\n{existing}" if existing else hook
+                        )
+                        st.rerun()
+            st.caption(tr("Hook Use Hint"))
         elif "video_hooks" in st.session_state:
             st.info(tr("No Hooks"))
 

@@ -195,6 +195,8 @@
     "Generating Hooks": "Generating hooks...",
     "Hook": "Hook",
     "Hook Copy Hint": "Select a hook to copy it, then paste it as the first line of your script.",
+    "Use Hook": "Use",
+    "Hook Use Hint": "Click 'Use' to put a hook at the start of your script, or select the text to copy it.",
     "No Hooks": "No hooks generated. Try again.",
     "Estimated Duration": "Estimated length",
     "words": "words",

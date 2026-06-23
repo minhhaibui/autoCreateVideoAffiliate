@@ -195,6 +195,8 @@
     "Generating Hooks": "Đang tạo hook...",
     "Hook": "Hook",
     "Hook Copy Hint": "Bôi đen một hook để sao chép, rồi dán vào làm câu đầu tiên của kịch bản.",
+    "Use Hook": "Dùng",
+    "Hook Use Hint": "Bấm 'Dùng' để chèn hook vào đầu kịch bản, hoặc bôi đen để sao chép.",
     "No Hooks": "Chưa tạo được hook. Hãy thử lại.",
     "Estimated Duration": "Thời lượng ước tính",
     "words": "từ",
