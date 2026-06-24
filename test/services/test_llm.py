@@ -962,6 +962,115 @@ class TestCommentReplies(unittest.TestCase):
         self.assertEqual(replies, [])
 
 
+class TestProductIdeas(unittest.TestCase):
+    """TikTok 带货选品（product idea）生成。"""
+
+    def test_generate_product_ideas_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "product": "mini blender",
+                    "category": "kitchen",
+                    "reason": "easy to demo",
+                    "audience": "busy people",
+                    "angle": "30s smoothie",
+                },
+                {
+                    "product": "LED strip",
+                    "category": "home",
+                    "reason": "satisfying reveal",
+                    "audience": "students",
+                    "angle": "room glow-up",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            ideas = llm.generate_product_ideas(
+                category="gadgets", market="US", language="English"
+            )
+
+        self.assertEqual(len(ideas), 2)
+        self.assertEqual(ideas[0]["product"], "mini blender")
+        for idea in ideas:
+            self.assertEqual(set(idea.keys()), set(llm.PRODUCT_IDEA_KEYS))
+
+    def test_generate_product_ideas_drops_items_without_product(self):
+        payload = json.dumps(
+            [
+                {"category": "kitchen", "reason": "no product -> dropped"},
+                "not a dict",
+                {"product": "real gadget", "category": "home"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            ideas = llm.generate_product_ideas()
+
+        self.assertEqual(len(ideas), 1)
+        self.assertEqual(ideas[0]["product"], "real gadget")
+
+    def test_generate_product_ideas_clamps_amount(self):
+        self.assertEqual(
+            llm._normalize_product_idea_count(999), llm.MAX_PRODUCT_IDEA_COUNT
+        )
+        self.assertEqual(llm._normalize_product_idea_count(0), 1)
+        self.assertEqual(
+            llm._normalize_product_idea_count("bad"),
+            llm.DEFAULT_PRODUCT_IDEA_COUNT,
+        )
+
+    def test_generate_product_ideas_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(llm.generate_product_ideas(), [])
+
+
+class TestHookVariations(unittest.TestCase):
+    """TikTok 带货开场钩子（hook）生成。"""
+
+    def test_generate_hook_variations_parses_strings(self):
+        payload = json.dumps(
+            [
+                "Stop scrolling if your kitchen is a mess",
+                "I wish someone told me this sooner",
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            hooks = llm.generate_hook_variations(
+                video_subject="mini blender", language="English"
+            )
+
+        self.assertEqual(hooks, [
+            "Stop scrolling if your kitchen is a mess",
+            "I wish someone told me this sooner",
+        ])
+
+    def test_generate_hook_variations_strips_markers_and_dedupes(self):
+        payload = json.dumps(
+            [
+                '1. "Stop scrolling now"',
+                "- Stop scrolling now",
+                "• A second hook",
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            hooks = llm.generate_hook_variations(video_subject="x")
+
+        # The numbered/quoted and bulleted duplicates collapse to one entry.
+        self.assertEqual(hooks, ["Stop scrolling now", "A second hook"])
+
+    def test_generate_hook_variations_clamps_amount(self):
+        self.assertEqual(llm._normalize_hook_count(999), llm.MAX_HOOK_COUNT)
+        self.assertEqual(llm._normalize_hook_count(0), 1)
+        self.assertEqual(llm._normalize_hook_count("bad"), llm.DEFAULT_HOOK_COUNT)
+
+    def test_generate_hook_variations_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(llm.generate_hook_variations(video_subject="x"), [])
+
+
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
 FOUNDRY_BASE = "https://amanrai-test-resource.services.ai.azure.com/anthropic"
 FOUNDRY_MODEL = "azure_ai/claude-sonnet-4-6"
