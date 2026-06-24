@@ -1596,6 +1596,130 @@ Predict {amount} of the most common comments viewers leave on a short affiliate 
     return replies[:amount]
 
 
+# =============================================================================
+# TikTok affiliate trending-sound idea generator
+#
+# 配乐对带货短视频的播放量影响很大，但创作者常常不知道该配什么风格的声音。这个
+# 功能根据视频主题给出「适合的声音风格 + 可以去声音库搜索的关键词 + 用法建议」。
+# 注意：模型无法访问实时热榜，所以这是基于通用短视频配乐规律的建议，而不是当下的
+# 实时热门曲目。复用现有 LLM provider，不接外部数据，也不影响视频生成主链路。
+# =============================================================================
+
+DEFAULT_SOUND_COUNT = 5
+MAX_SOUND_COUNT = 10
+MAX_SOUND_FIELD_LENGTH = 200
+SOUND_KEYS = ("sound", "vibe", "search", "tip")
+
+
+def _normalize_sound_count(amount) -> int:
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return DEFAULT_SOUND_COUNT
+    return max(1, min(MAX_SOUND_COUNT, amount))
+
+
+def _coerce_sound_idea(item) -> dict:
+    """Normalize one LLM-returned sound idea into the fixed {key: str} shape,
+    dropping items that are not dicts or describe no sound."""
+    if not isinstance(item, dict):
+        return {}
+    idea = {}
+    for key in SOUND_KEYS:
+        value = item.get(key, "")
+        idea[key] = _clamp_text(value, MAX_SOUND_FIELD_LENGTH)
+    if not idea["sound"]:
+        return {}
+    return idea
+
+
+def generate_sound_ideas(
+    video_subject: str,
+    language: str = "",
+    amount: int = DEFAULT_SOUND_COUNT,
+) -> List[dict]:
+    """Suggest sound / music styles that tend to fit an affiliate video about
+    ``video_subject``, plus a keyword to search for them in a sound library.
+
+    Returns a list of dicts with the keys in SOUND_KEYS (sound, vibe, search,
+    tip). These are AI suggestions based on general short-video audio patterns,
+    NOT a real-time trending chart. On repeated failure an empty list is returned
+    so the caller can show a friendly message rather than crash.
+    """
+    amount = _normalize_sound_count(amount)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "sound", "vibe", "search" and "tip" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the subject."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Sound Picker
+
+## Goals:
+Suggest {amount} sound / music styles that would fit a short affiliate video about "{video_subject}", and for each give a keyword the creator can search in the app's sound library.
+
+## Important:
+1. you cannot see real-time charts, so describe sound STYLES and search keywords, not specific copyrighted track titles you are unsure exist.
+2. prefer styles proven to work in short commerce videos: upbeat pop, satisfying/ASMR, calm aesthetic, suspense build-up, trending-style voiceover beats.
+3. only suggest royalty-free-friendly or in-app library styles; do not tell the user to rip copyrighted music.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "sound", "vibe", "search", "tip".
+   - "sound": a short name for the sound / music style.
+   - "vibe": the mood or energy it gives the video.
+   - "search": a short keyword to find this kind of sound in a sound library.
+   - "tip": one short tip on how to use it (e.g. sync the product reveal to the beat).
+3. {language_line}
+4. make the {amount} suggestions clearly different from each other.
+
+## Output Example:
+[{{"sound": "...", "vibe": "...", "search": "...", "tip": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating sound ideas: subject={video_subject!r}, amount={amount}, "
+        f"language={language!r}"
+    )
+
+    ideas: List[dict] = []
+    response = ""
+    for i in range(_max_retries):
+        try:
+            response = _generate_response(prompt)
+            if isinstance(response, str) and "Error: " in response:
+                logger.error(f"failed to generate sound ideas: {response}")
+                break
+            raw = json.loads(response)
+        except Exception as e:
+            logger.warning(f"failed to parse sound ideas: {str(e)}")
+            raw = None
+            if response:
+                match = re.search(r"\[.*]", response, re.DOTALL)
+                if match:
+                    try:
+                        raw = json.loads(match.group())
+                    except Exception as e:
+                        logger.warning(f"failed to parse sound ideas json: {str(e)}")
+
+        if isinstance(raw, list):
+            ideas = [idea for idea in (_coerce_sound_idea(x) for x in raw) if idea]
+
+        if ideas:
+            break
+        if i < _max_retries - 1:
+            logger.warning(f"failed to generate sound ideas, trying again... {i + 1}")
+
+    logger.success(f"completed: {len(ideas)} sound ideas")
+    return ideas[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(

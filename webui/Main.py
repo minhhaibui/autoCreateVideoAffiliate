@@ -259,7 +259,15 @@ def render_subtitle_preview(
 
 
 def build_affiliate_package_text(
-    subject, script, keywords, hooks, social_meta, label, shots=None, comment_replies=None
+    subject,
+    script,
+    keywords,
+    hooks,
+    social_meta,
+    label,
+    shots=None,
+    comment_replies=None,
+    sound_ideas=None,
 ):
     """Assemble all generated affiliate assets into one plain-text document the
     user can download/keep. ``label`` maps section keys to translated headings so
@@ -306,6 +314,19 @@ def build_affiliate_package_text(
                 f"   {label('reply')}: {pair.get('reply', '')}"
             )
         section(label("comment_replies"), "\n".join(blocks))
+
+    if sound_ideas:
+        blocks = []
+        for i, idea in enumerate(sound_ideas):
+            parts = [f"{i + 1}. {idea.get('sound', '')}".rstrip()]
+            if idea.get("vibe"):
+                parts.append(f"   {label('sound_vibe')}: {idea['vibe']}")
+            if idea.get("search"):
+                parts.append(f"   {label('sound_search')}: {idea['search']}")
+            if idea.get("tip"):
+                parts.append(f"   {label('sound_tip')}: {idea['tip']}")
+            blocks.append("\n".join(parts))
+        section(label("sounds"), "\n".join(blocks))
 
     return "\n".join(lines).strip() + "\n"
 
@@ -1244,6 +1265,51 @@ with left_panel:
         elif "comment_replies" in st.session_state:
             st.info(tr("No Comment Replies"))
 
+    # Trending-sound helper. Music choice strongly affects a TikTok's reach, but
+    # creators often don't know what to put on. This suggests sound STYLES plus a
+    # keyword to search the in-app sound library (the LLM can't see live charts,
+    # so it's framed as general patterns, not a real-time trending list).
+    with st.container(border=True):
+        st.write(tr("Trending Sounds"))
+        st.caption(tr("Trending Sounds Hint"))
+        sound_amount = st.slider(
+            tr("Number of Sounds"),
+            min_value=3,
+            max_value=llm.MAX_SOUND_COUNT,
+            value=llm.DEFAULT_SOUND_COUNT,
+            key="sound_amount",
+        )
+        if st.button(tr("Suggest Sounds"), key="auto_generate_sounds"):
+            if not params.video_subject:
+                st.error(tr("Please Enter the Video Subject"))
+            else:
+                with st.spinner(tr("Generating Sounds")):
+                    st.session_state["sound_ideas"] = llm.generate_sound_ideas(
+                        video_subject=params.video_subject,
+                        language=(
+                            params.video_language
+                            or st.session_state.get("ui_language", "")
+                        ),
+                        amount=sound_amount,
+                    )
+
+        sound_ideas = st.session_state.get("sound_ideas") or []
+        if sound_ideas:
+            for i, idea in enumerate(sound_ideas):
+                with st.expander(
+                    f"🎵 {idea.get('sound', '')}",
+                    expanded=(i == 0),
+                ):
+                    if idea.get("vibe"):
+                        st.markdown(f"**{tr('Sound Vibe')}:** {idea['vibe']}")
+                    if idea.get("search"):
+                        st.markdown(f"**{tr('Sound Search')}:** {idea['search']}")
+                    if idea.get("tip"):
+                        st.markdown(f"**{tr('Sound Tip')}:** {idea['tip']}")
+            st.caption(tr("Trending Sounds Use Hint"))
+        elif "sound_ideas" in st.session_state:
+            st.info(tr("No Sounds"))
+
     # Export helper: bundle every generated asset (subject, hooks, script,
     # keywords, caption, hashtags) into one text file so creators can archive
     # their copy or move it into a publishing tool in a single click.
@@ -1264,6 +1330,10 @@ with left_panel:
             "hashtags": tr("Hashtags"),
             "comment_replies": tr("Comment Replies"),
             "reply": tr("Suggested Reply"),
+            "sounds": tr("Trending Sounds"),
+            "sound_vibe": tr("Sound Vibe"),
+            "sound_search": tr("Sound Search"),
+            "sound_tip": tr("Sound Tip"),
         }
         package_text = build_affiliate_package_text(
             subject=params.video_subject,
@@ -1273,6 +1343,7 @@ with left_panel:
             social_meta=st.session_state.get("social_metadata"),
             shots=st.session_state.get("video_shots") or [],
             comment_replies=st.session_state.get("comment_replies") or [],
+            sound_ideas=st.session_state.get("sound_ideas") or [],
             label=lambda key: _section_labels.get(key, key),
         )
         has_content = bool(package_text.strip())

@@ -1071,6 +1071,70 @@ class TestHookVariations(unittest.TestCase):
             self.assertEqual(llm.generate_hook_variations(video_subject="x"), [])
 
 
+class TestSoundIdeas(unittest.TestCase):
+    """TikTok 带货配乐（trending sound）建议生成。"""
+
+    def test_generate_sound_ideas_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "sound": "upbeat pop",
+                    "vibe": "energetic",
+                    "search": "happy upbeat pop",
+                    "tip": "sync the product reveal to the beat",
+                },
+                {
+                    "sound": "satisfying ASMR",
+                    "vibe": "calm and crisp",
+                    "search": "asmr satisfying",
+                    "tip": "use it over the close-up demo",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            ideas = llm.generate_sound_ideas(
+                video_subject="mini blender", language="English"
+            )
+
+        self.assertEqual(len(ideas), 2)
+        self.assertEqual(ideas[0]["sound"], "upbeat pop")
+        for idea in ideas:
+            self.assertEqual(set(idea.keys()), set(llm.SOUND_KEYS))
+
+    def test_generate_sound_ideas_drops_items_without_sound(self):
+        payload = json.dumps(
+            [
+                {"vibe": "energetic", "search": "no sound -> dropped"},
+                "not a dict",
+                {"sound": "calm aesthetic", "vibe": "chill"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            ideas = llm.generate_sound_ideas(video_subject="x")
+
+        self.assertEqual(len(ideas), 1)
+        self.assertEqual(ideas[0]["sound"], "calm aesthetic")
+
+    def test_generate_sound_ideas_recovers_embedded_json(self):
+        payload = 'Here you go: [{"sound": "suspense build-up"}] enjoy'
+        with patch.object(llm, "_generate_response", return_value=payload):
+            ideas = llm.generate_sound_ideas(video_subject="x")
+
+        self.assertEqual(len(ideas), 1)
+        self.assertEqual(ideas[0]["sound"], "suspense build-up")
+
+    def test_generate_sound_ideas_clamps_amount(self):
+        self.assertEqual(llm._normalize_sound_count(999), llm.MAX_SOUND_COUNT)
+        self.assertEqual(llm._normalize_sound_count(0), 1)
+        self.assertEqual(llm._normalize_sound_count("bad"), llm.DEFAULT_SOUND_COUNT)
+
+    def test_generate_sound_ideas_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(llm.generate_sound_ideas(video_subject="x"), [])
+
+
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
 FOUNDRY_BASE = "https://amanrai-test-resource.services.ai.azure.com/anthropic"
 FOUNDRY_MODEL = "azure_ai/claude-sonnet-4-6"
