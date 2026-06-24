@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import tempfile
@@ -832,6 +833,133 @@ class TestSocialMetadata(unittest.TestCase):
                 },
             },
         )
+
+
+class TestShotList(unittest.TestCase):
+    """TikTok 带货分镜（shot list）生成。"""
+
+    def test_generate_shot_list_parses_and_orders_shots(self):
+        payload = json.dumps(
+            [
+                {
+                    "scene": "Hold the product to camera",
+                    "voiceover": "This changed my morning",
+                    "onscreen_text": "WATCH THIS",
+                    "broll": "",
+                },
+                {
+                    "scene": "Close-up demo",
+                    "voiceover": "Look how fast it works",
+                    "onscreen_text": "so fast",
+                    "broll": "kitchen gadget closeup",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            shots = llm.generate_shot_list(
+                video_subject="mini blender",
+                video_script="Make a smoothie in 30 seconds.",
+                language="English",
+            )
+
+        self.assertEqual(len(shots), 2)
+        self.assertEqual(shots[0]["scene"], "Hold the product to camera")
+        self.assertEqual(shots[1]["broll"], "kitchen gadget closeup")
+        for shot in shots:
+            self.assertEqual(set(shot.keys()), set(llm.SHOT_KEYS))
+
+    def test_generate_shot_list_drops_items_without_scene(self):
+        payload = json.dumps(
+            [
+                {"scene": "", "voiceover": "no scene -> dropped"},
+                {"not": "a shot"},
+                "not a dict",
+                {"scene": "Real shot", "voiceover": "kept"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            shots = llm.generate_shot_list(video_subject="x")
+
+        self.assertEqual(len(shots), 1)
+        self.assertEqual(shots[0]["scene"], "Real shot")
+
+    def test_generate_shot_list_recovers_embedded_json(self):
+        payload = 'Sure thing! [{"scene": "Shot one"}] hope that helps'
+        with patch.object(llm, "_generate_response", return_value=payload):
+            shots = llm.generate_shot_list(video_subject="x")
+
+        self.assertEqual(len(shots), 1)
+        self.assertEqual(shots[0]["scene"], "Shot one")
+
+    def test_generate_shot_list_clamps_amount(self):
+        self.assertEqual(llm._normalize_shot_count(999), llm.MAX_SHOT_COUNT)
+        self.assertEqual(llm._normalize_shot_count(0), 1)
+        self.assertEqual(llm._normalize_shot_count("bad"), llm.DEFAULT_SHOT_COUNT)
+
+    def test_generate_shot_list_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            shots = llm.generate_shot_list(video_subject="x")
+
+        self.assertEqual(shots, [])
+
+
+class TestCommentReplies(unittest.TestCase):
+    """TikTok 带货评论区回复 / 异议处理生成。"""
+
+    def test_generate_comment_replies_parses_pairs(self):
+        payload = json.dumps(
+            [
+                {"comment": "where can I buy this?", "reply": "Link in my bio!"},
+                {
+                    "comment": "does it actually work?",
+                    "reply": "Yes — full demo is in the video.",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            replies = llm.generate_comment_replies(
+                video_subject="mini blender", language="English"
+            )
+
+        self.assertEqual(len(replies), 2)
+        self.assertEqual(replies[0]["comment"], "where can I buy this?")
+        for pair in replies:
+            self.assertEqual(set(pair.keys()), set(llm.COMMENT_REPLY_KEYS))
+
+    def test_generate_comment_replies_drops_incomplete_pairs(self):
+        payload = json.dumps(
+            [
+                {"comment": "too expensive"},
+                {"reply": "no comment -> dropped"},
+                "not a dict",
+                {"comment": "price?", "reply": "Check the link in bio."},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            replies = llm.generate_comment_replies(video_subject="x")
+
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(replies[0]["comment"], "price?")
+
+    def test_generate_comment_replies_clamps_amount(self):
+        self.assertEqual(
+            llm._normalize_comment_reply_count(999), llm.MAX_COMMENT_REPLY_COUNT
+        )
+        self.assertEqual(llm._normalize_comment_reply_count(0), 1)
+        self.assertEqual(
+            llm._normalize_comment_reply_count("bad"),
+            llm.DEFAULT_COMMENT_REPLY_COUNT,
+        )
+
+    def test_generate_comment_replies_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            replies = llm.generate_comment_replies(video_subject="x")
+
+        self.assertEqual(replies, [])
 
 
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
