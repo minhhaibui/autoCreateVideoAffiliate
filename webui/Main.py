@@ -259,7 +259,7 @@ def render_subtitle_preview(
 
 
 def build_affiliate_package_text(
-    subject, script, keywords, hooks, social_meta, label, shots=None
+    subject, script, keywords, hooks, social_meta, label, shots=None, comment_replies=None
 ):
     """Assemble all generated affiliate assets into one plain-text document the
     user can download/keep. ``label`` maps section keys to translated headings so
@@ -297,6 +297,15 @@ def build_affiliate_package_text(
         section(label("caption"), social_meta.get("caption", ""))
         hashtags = " ".join(social_meta.get("hashtags", []) or [])
         section(label("hashtags"), hashtags)
+
+    if comment_replies:
+        blocks = []
+        for i, pair in enumerate(comment_replies):
+            blocks.append(
+                f"{i + 1}. {pair.get('comment', '')}\n"
+                f"   {label('reply')}: {pair.get('reply', '')}"
+            )
+        section(label("comment_replies"), "\n".join(blocks))
 
     return "\n".join(lines).strip() + "\n"
 
@@ -1190,6 +1199,51 @@ with left_panel:
             st.text_area(tr("Caption"), value=full_caption, height=180)
             st.caption(tr("Caption Copy Hint"))
 
+    # Comment-reply helper. A lot of affiliate conversion happens in the comments
+    # ("how much?", "where to buy?", "does it work?"). This drafts ready-to-paste
+    # replies for the most likely comments so the creator can answer fast and
+    # point viewers to the link. Reuses the existing LLM provider.
+    with st.container(border=True):
+        st.write(tr("Comment Replies"))
+        st.caption(tr("Comment Replies Hint"))
+        comment_reply_amount = st.slider(
+            tr("Number of Replies"),
+            min_value=3,
+            max_value=llm.MAX_COMMENT_REPLY_COUNT,
+            value=llm.DEFAULT_COMMENT_REPLY_COUNT,
+            key="comment_reply_amount",
+        )
+        if st.button(tr("Generate Comment Replies"), key="auto_generate_comment_replies"):
+            if not params.video_subject:
+                st.error(tr("Please Enter the Video Subject"))
+            else:
+                with st.spinner(tr("Generating Comment Replies")):
+                    st.session_state["comment_replies"] = llm.generate_comment_replies(
+                        video_subject=params.video_subject,
+                        language=(
+                            params.video_language
+                            or st.session_state.get("ui_language", "")
+                        ),
+                        amount=comment_reply_amount,
+                    )
+
+        comment_replies = st.session_state.get("comment_replies") or []
+        if comment_replies:
+            for i, pair in enumerate(comment_replies):
+                with st.expander(
+                    f"💬 {pair.get('comment', '')}",
+                    expanded=(i == 0),
+                ):
+                    st.text_area(
+                        tr("Suggested Reply"),
+                        value=pair.get("reply", ""),
+                        key=f"comment_reply_{i}",
+                        height=80,
+                    )
+            st.caption(tr("Comment Replies Use Hint"))
+        elif "comment_replies" in st.session_state:
+            st.info(tr("No Comment Replies"))
+
     # Export helper: bundle every generated asset (subject, hooks, script,
     # keywords, caption, hashtags) into one text file so creators can archive
     # their copy or move it into a publishing tool in a single click.
@@ -1208,6 +1262,8 @@ with left_panel:
             "title": tr("Post Title"),
             "caption": tr("Caption"),
             "hashtags": tr("Hashtags"),
+            "comment_replies": tr("Comment Replies"),
+            "reply": tr("Suggested Reply"),
         }
         package_text = build_affiliate_package_text(
             subject=params.video_subject,
@@ -1216,6 +1272,7 @@ with left_panel:
             hooks=st.session_state.get("video_hooks") or [],
             social_meta=st.session_state.get("social_metadata"),
             shots=st.session_state.get("video_shots") or [],
+            comment_replies=st.session_state.get("comment_replies") or [],
             label=lambda key: _section_labels.get(key, key),
         )
         has_content = bool(package_text.strip())

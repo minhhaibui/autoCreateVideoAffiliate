@@ -1468,6 +1468,134 @@ Turn a short affiliate video about "{video_subject}" into a clear shot-by-shot s
     return shots[:amount]
 
 
+# =============================================================================
+# TikTok affiliate comment-reply / objection-handling generator
+#
+# 带货短视频的转化很大一部分发生在评论区：观众会问「多少钱」「在哪买」「真的有用
+# 吗」。这个功能预测最常见的提问/异议，并给出可直接复制粘贴、能把人引导到购物车/
+# 主页链接的回复，帮创作者更快地把评论变成订单。复用现有 LLM provider，不接外部
+# 数据，也不影响视频生成主链路。
+# =============================================================================
+
+DEFAULT_COMMENT_REPLY_COUNT = 6
+MAX_COMMENT_REPLY_COUNT = 12
+MAX_COMMENT_REPLY_FIELD_LENGTH = 300
+COMMENT_REPLY_KEYS = ("comment", "reply")
+
+
+def _normalize_comment_reply_count(amount) -> int:
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return DEFAULT_COMMENT_REPLY_COUNT
+    return max(1, min(MAX_COMMENT_REPLY_COUNT, amount))
+
+
+def _coerce_comment_reply(item) -> dict:
+    """Normalize one LLM-returned pair into the fixed {comment, reply} shape,
+    dropping items that are not dicts or are missing either side."""
+    if not isinstance(item, dict):
+        return {}
+    pair = {}
+    for key in COMMENT_REPLY_KEYS:
+        value = item.get(key, "")
+        pair[key] = _clamp_text(value, MAX_COMMENT_REPLY_FIELD_LENGTH)
+    if not pair["comment"] or not pair["reply"]:
+        return {}
+    return pair
+
+
+def generate_comment_replies(
+    video_subject: str,
+    language: str = "",
+    amount: int = DEFAULT_COMMENT_REPLY_COUNT,
+) -> List[dict]:
+    """Predict the most common viewer comments / objections on an affiliate video
+    and draft a ready-to-paste reply for each that nudges toward the link.
+
+    Returns a list of dicts with the keys in COMMENT_REPLY_KEYS (comment, reply).
+    On repeated failure an empty list is returned so the caller can show a
+    friendly message rather than crash.
+    """
+    amount = _normalize_comment_reply_count(amount)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "comment" and "reply" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the subject."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Community Manager
+
+## Goals:
+Predict {amount} of the most common comments viewers leave on a short affiliate video about "{video_subject}", and write a short reply for each that politely answers and nudges the viewer toward the product link.
+
+## Cover a realistic mix:
+1. buying questions ("how much is it", "where do I get it", "is there a link").
+2. doubts / objections ("does it actually work", "looks cheap", "too expensive").
+3. positive comments worth converting ("I need this", "omg").
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "comment", "reply".
+   - "comment": a short, realistic viewer comment.
+   - "reply": a friendly 1-2 sentence reply that answers and points to the link in bio / cart.
+3. {language_line}
+4. do not invent fake prices, fake discounts, fake reviews, or unverifiable claims.
+5. keep replies honest and non-spammy; no guarantees about results or health/financial outcomes.
+
+## Output Example:
+[{{"comment": "where can I buy this?", "reply": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating comment replies: subject={video_subject!r}, amount={amount}, "
+        f"language={language!r}"
+    )
+
+    replies: List[dict] = []
+    response = ""
+    for i in range(_max_retries):
+        try:
+            response = _generate_response(prompt)
+            if isinstance(response, str) and "Error: " in response:
+                logger.error(f"failed to generate comment replies: {response}")
+                break
+            raw = json.loads(response)
+        except Exception as e:
+            logger.warning(f"failed to parse comment replies: {str(e)}")
+            raw = None
+            if response:
+                match = re.search(r"\[.*]", response, re.DOTALL)
+                if match:
+                    try:
+                        raw = json.loads(match.group())
+                    except Exception as e:
+                        logger.warning(
+                            f"failed to parse comment replies json: {str(e)}"
+                        )
+
+        if isinstance(raw, list):
+            replies = [
+                pair for pair in (_coerce_comment_reply(x) for x in raw) if pair
+            ]
+
+        if replies:
+            break
+        if i < _max_retries - 1:
+            logger.warning(
+                f"failed to generate comment replies, trying again... {i + 1}"
+            )
+
+    logger.success(f"completed: {len(replies)} comment replies")
+    return replies[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(
