@@ -259,7 +259,7 @@ def render_subtitle_preview(
 
 
 def build_affiliate_package_text(
-    subject, script, keywords, hooks, social_meta, label
+    subject, script, keywords, hooks, social_meta, label, shots=None
 ):
     """Assemble all generated affiliate assets into one plain-text document the
     user can download/keep. ``label`` maps section keys to translated headings so
@@ -278,6 +278,18 @@ def build_affiliate_package_text(
         numbered = "\n".join(f"{i + 1}. {h}" for i, h in enumerate(hooks))
         section(label("hooks"), numbered)
     section(label("script"), script)
+    if shots:
+        blocks = []
+        for i, shot in enumerate(shots):
+            parts = [f"{i + 1}. {shot.get('scene', '')}".rstrip()]
+            if shot.get("voiceover"):
+                parts.append(f"   {label('shot_voiceover')}: {shot['voiceover']}")
+            if shot.get("onscreen_text"):
+                parts.append(f"   {label('shot_onscreen')}: {shot['onscreen_text']}")
+            if shot.get("broll"):
+                parts.append(f"   {label('shot_broll')}: {shot['broll']}")
+            blocks.append("\n".join(parts))
+        section(label("shots"), "\n".join(blocks))
     section(label("keywords"), keywords)
 
     if social_meta:
@@ -1078,6 +1090,56 @@ with left_panel:
         elif "video_hooks" in st.session_state:
             st.info(tr("No Hooks"))
 
+    # Shot list / storyboard generator. Turns the written script into a
+    # shot-by-shot shooting plan (scene, voiceover line, on-screen text, b-roll
+    # keyword) so the creator knows exactly what to film. Reuses the existing LLM
+    # provider and does not touch the video-generation pipeline.
+    with st.container(border=True):
+        st.write(tr("Shot List"))
+        st.caption(tr("Shot List Hint"))
+        shot_amount = st.slider(
+            tr("Number of Shots"),
+            min_value=3,
+            max_value=llm.MAX_SHOT_COUNT,
+            value=llm.DEFAULT_SHOT_COUNT,
+            key="shot_amount",
+        )
+        if st.button(tr("Generate Shot List"), key="auto_generate_shots"):
+            if not params.video_subject:
+                st.error(tr("Please Enter the Video Subject"))
+            else:
+                with st.spinner(tr("Generating Shot List")):
+                    st.session_state["video_shots"] = llm.generate_shot_list(
+                        video_subject=params.video_subject,
+                        video_script=st.session_state.get("video_script", ""),
+                        language=(
+                            params.video_language
+                            or st.session_state.get("ui_language", "")
+                        ),
+                        amount=shot_amount,
+                    )
+
+        video_shots = st.session_state.get("video_shots") or []
+        if video_shots:
+            for i, shot in enumerate(video_shots):
+                with st.expander(
+                    f"{tr('Shot')} {i + 1} — {shot.get('scene', '')}",
+                    expanded=(i == 0),
+                ):
+                    if shot.get("voiceover"):
+                        st.markdown(
+                            f"**{tr('Shot Voiceover')}:** {shot['voiceover']}"
+                        )
+                    if shot.get("onscreen_text"):
+                        st.markdown(
+                            f"**{tr('Shot On-screen Text')}:** {shot['onscreen_text']}"
+                        )
+                    if shot.get("broll"):
+                        st.markdown(f"**{tr('Shot B-roll')}:** {shot['broll']}")
+            st.caption(tr("Shot List Use Hint"))
+        elif "video_shots" in st.session_state:
+            st.info(tr("No Shots"))
+
     # TikTok / short-video post caption helper. Reuses the existing
     # llm.generate_social_metadata backend (already used by the REST API) so the
     # WebUI user can produce a ready-to-paste title, caption and hashtags for
@@ -1138,6 +1200,10 @@ with left_panel:
             "subject": tr("Video Subject"),
             "hooks": tr("Hook Ideas"),
             "script": tr("Video Script"),
+            "shots": tr("Shot List"),
+            "shot_voiceover": tr("Shot Voiceover"),
+            "shot_onscreen": tr("Shot On-screen Text"),
+            "shot_broll": tr("Shot B-roll"),
             "keywords": tr("Video Keywords"),
             "title": tr("Post Title"),
             "caption": tr("Caption"),
@@ -1149,6 +1215,7 @@ with left_panel:
             keywords=st.session_state.get("video_terms", ""),
             hooks=st.session_state.get("video_hooks") or [],
             social_meta=st.session_state.get("social_metadata"),
+            shots=st.session_state.get("video_shots") or [],
             label=lambda key: _section_labels.get(key, key),
         )
         has_content = bool(package_text.strip())

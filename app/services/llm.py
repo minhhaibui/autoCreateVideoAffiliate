@@ -1333,6 +1333,141 @@ Write {amount} different scroll-stopping opening lines (hooks) for a short TikTo
     return hooks[:amount]
 
 
+# =============================================================================
+# TikTok affiliate shot list / storyboard generator
+#
+# 把已经写好的口播脚本拆成一条条「分镜」，每个镜头给出：要拍/要展示的画面、
+# 这一句的口播文案、屏幕上的字幕贴纸、以及一个可直接拿去搜素材的 b-roll 关键词。
+# 带货创作者最常卡在「文案有了但不知道怎么拍」，这个功能把脚本变成可执行的拍摄
+# 清单。复用现有 LLM provider，不接外部数据，也不影响视频生成主链路。
+# =============================================================================
+
+DEFAULT_SHOT_COUNT = 6
+MAX_SHOT_COUNT = 15
+MAX_SHOT_FIELD_LENGTH = 200
+SHOT_KEYS = ("scene", "voiceover", "onscreen_text", "broll")
+
+
+def _normalize_shot_count(amount) -> int:
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return DEFAULT_SHOT_COUNT
+    return max(1, min(MAX_SHOT_COUNT, amount))
+
+
+def _coerce_shot(item) -> dict:
+    """Normalize one LLM-returned shot into the fixed {key: str} shape, dropping
+    items that are not dicts or describe no scene to film."""
+    if not isinstance(item, dict):
+        return {}
+    shot = {}
+    for key in SHOT_KEYS:
+        value = item.get(key, "")
+        shot[key] = _clamp_text(value, MAX_SHOT_FIELD_LENGTH)
+    if not shot["scene"]:
+        return {}
+    return shot
+
+
+def generate_shot_list(
+    video_subject: str,
+    video_script: str = "",
+    language: str = "",
+    amount: int = DEFAULT_SHOT_COUNT,
+) -> List[dict]:
+    """Break an affiliate video script into a shot-by-shot shooting plan.
+
+    Returns a list of dicts with the keys in SHOT_KEYS (scene, voiceover,
+    onscreen_text, broll). The shots follow the order of the script so the
+    creator can film them top to bottom. On repeated failure an empty list is
+    returned so the caller can show a friendly message rather than crash.
+    """
+    amount = _normalize_shot_count(amount)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    video_script = _limit_script_text(
+        video_script, MAX_SOCIAL_SCRIPT_LENGTH, "video_script"
+    )
+    language = (language or "").strip()
+
+    script_line = (
+        f'Base the shots on this existing script:\n"""\n{video_script}\n"""'
+        if video_script
+        else "No script was provided, so plan shots that would naturally tell this product's story."
+    )
+    language_line = (
+        f'Write the "scene", "voiceover", "onscreen_text" and "broll" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the subject / script."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Video Director
+
+## Goals:
+Turn a short affiliate video about "{video_subject}" into a clear shot-by-shot shooting plan of about {amount} shots.
+
+## Context:
+{script_line}
+
+## What each shot needs:
+1. follow the natural order of the video (hook first, then benefits / demo, then call-to-action last).
+2. be simple and realistic to film on a phone by a solo creator.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "scene", "voiceover", "onscreen_text", "broll".
+   - "scene": what to film or show on screen for this shot, short and concrete.
+   - "voiceover": the spoken line for this shot (reuse / lightly trim the script if one is given).
+   - "onscreen_text": a very short text sticker / caption to overlay (a few words).
+   - "broll": one short stock-footage search keyword if real filming is hard, else "".
+3. {language_line}
+4. produce about {amount} shots, ordered from first to last.
+5. do not invent fake prices, fake discounts, or unverifiable statistics.
+
+## Output Example:
+[{{"scene": "...", "voiceover": "...", "onscreen_text": "...", "broll": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating shot list: subject={video_subject!r}, amount={amount}, "
+        f"has_script={bool(video_script)}, language={language!r}"
+    )
+
+    shots: List[dict] = []
+    response = ""
+    for i in range(_max_retries):
+        try:
+            response = _generate_response(prompt)
+            if isinstance(response, str) and "Error: " in response:
+                logger.error(f"failed to generate shot list: {response}")
+                break
+            raw = json.loads(response)
+        except Exception as e:
+            logger.warning(f"failed to parse shot list: {str(e)}")
+            raw = None
+            if response:
+                match = re.search(r"\[.*]", response, re.DOTALL)
+                if match:
+                    try:
+                        raw = json.loads(match.group())
+                    except Exception as e:
+                        logger.warning(f"failed to parse shot list json: {str(e)}")
+
+        if isinstance(raw, list):
+            shots = [shot for shot in (_coerce_shot(x) for x in raw) if shot]
+
+        if shots:
+            break
+        if i < _max_retries - 1:
+            logger.warning(f"failed to generate shot list, trying again... {i + 1}")
+
+    logger.success(f"completed: {len(shots)} shots")
+    return shots[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(
