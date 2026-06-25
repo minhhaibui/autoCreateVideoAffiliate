@@ -27,6 +27,7 @@ from app.models.schema import (
 from app.services import llm, voice
 from app.services import task as tm
 from app.services.affiliate import build_affiliate_package_text
+from app.services.fonts import get_recommended_font
 from app.utils import utils
 
 st.set_page_config(
@@ -130,31 +131,6 @@ def get_all_fonts():
                 fonts.append(file)
     fonts.sort()
     return fonts
-
-
-# Fonts that correctly render a given language's glyphs/diacritics.
-# Generic CJK fonts (e.g. MicrosoftYaHei) do not render Vietnamese tone
-# marks reliably, so prefer a Vietnamese-designed font for vi content.
-_RECOMMENDED_FONTS_BY_LANG = {
-    "vi": ["BeVietnamPro-Bold.ttf", "UTM Kabel KT.ttf"],
-    "zh": ["MicrosoftYaHeiBold.ttc", "STHeitiMedium.ttc"],
-}
-
-
-def get_recommended_font(language_code, available_fonts):
-    """Return the best-fit subtitle font for a language, falling back to the
-    first available font when no preferred font is installed.
-
-    language_code may be a UI code ("vi") or a locale ("vi-VN"); only the
-    leading language part is used for matching.
-    """
-    lang = (language_code or "").split("-")[0].lower()
-    for preferred in _RECOMMENDED_FONTS_BY_LANG.get(lang, []):
-        if preferred in available_fonts:
-            return preferred
-    if "MicrosoftYaHeiBold.ttc" in available_fonts:
-        return "MicrosoftYaHeiBold.ttc"
-    return available_fonts[0] if available_fonts else "MicrosoftYaHeiBold.ttc"
 
 
 def _preview_hex_to_rgb(color):
