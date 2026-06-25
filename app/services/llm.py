@@ -1836,6 +1836,127 @@ Write {amount} short on-screen text stickers (captions the creator overlays on t
     return stickers[:amount]
 
 
+DEFAULT_COVER_COUNT = 4
+MAX_COVER_COUNT = 8
+MAX_COVER_FIELD_LENGTH = 200
+COVER_KEYS = ("text", "subtext", "angle", "tip")
+
+
+def _normalize_cover_count(amount) -> int:
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return DEFAULT_COVER_COUNT
+    return max(1, min(MAX_COVER_COUNT, amount))
+
+
+def _coerce_cover_idea(item) -> dict:
+    """Normalize one LLM-returned cover-text idea into the fixed {key: str}
+    shape, dropping items that are not dicts or carry no headline text."""
+    if not isinstance(item, dict):
+        return {}
+    idea = {}
+    for key in COVER_KEYS:
+        value = item.get(key, "")
+        idea[key] = _clamp_text(value, MAX_COVER_FIELD_LENGTH)
+    if not idea["text"]:
+        return {}
+    return idea
+
+
+def generate_cover_text_ideas(
+    video_subject: str,
+    language: str = "",
+    amount: int = DEFAULT_COVER_COUNT,
+) -> List[dict]:
+    """Suggest bold cover / thumbnail headlines for a short affiliate video about
+    ``video_subject`` — the text shown on the cover frame in the For You / profile
+    grid that makes someone tap.
+
+    Returns a list of dicts with the keys in COVER_KEYS (text, subtext, angle,
+    tip). ``text`` is the big headline, ``subtext`` an optional smaller second
+    line, ``angle`` the hook it leans on, and ``tip`` a quick design/placement
+    note. On repeated failure an empty list is returned so the caller can show a
+    friendly message rather than crash.
+    """
+    amount = _normalize_cover_count(amount)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "text", "subtext", "angle" and "tip" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the subject."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Cover / Thumbnail Headline Writer
+
+## Goals:
+Write {amount} cover (thumbnail) headline options for a short affiliate video about "{video_subject}". This is the bold text shown on the cover frame in the For You feed and profile grid — its only job is to make someone stop and tap.
+
+## Important:
+1. the main "text" headline must be VERY short and punchy — a few big words that read instantly on a small thumbnail; do not write a full sentence.
+2. lean on a curiosity, benefit, problem or social-proof angle, but stay honest — no fake prices, fake discounts, or claims you cannot back up.
+3. give each option a clearly different angle so the creator can A/B test covers.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "text", "subtext", "angle", "tip".
+   - "text": the big headline on the cover.
+   - "subtext": an optional shorter second line (use "" if none needed).
+   - "angle": the hook it leans on (curiosity, benefit, problem, social proof).
+   - "tip": one short design/placement tip (e.g. bright frame, keep text in the top third, high contrast).
+3. {language_line}
+4. make the {amount} options clearly different from each other.
+
+## Output Example:
+[{{"text": "...", "subtext": "...", "angle": "...", "tip": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating cover text ideas: subject={video_subject!r}, amount={amount}, "
+        f"language={language!r}"
+    )
+
+    ideas: List[dict] = []
+    response = ""
+    for i in range(_max_retries):
+        try:
+            response = _generate_response(prompt)
+            if isinstance(response, str) and "Error: " in response:
+                logger.error(f"failed to generate cover text ideas: {response}")
+                break
+            raw = json.loads(response)
+        except Exception as e:
+            logger.warning(f"failed to parse cover text ideas: {str(e)}")
+            raw = None
+            if response:
+                match = re.search(r"\[.*]", response, re.DOTALL)
+                if match:
+                    try:
+                        raw = json.loads(match.group())
+                    except Exception as e:
+                        logger.warning(
+                            f"failed to parse cover text ideas json: {str(e)}"
+                        )
+
+        if isinstance(raw, list):
+            ideas = [idea for idea in (_coerce_cover_idea(x) for x in raw) if idea]
+
+        if ideas:
+            break
+        if i < _max_retries - 1:
+            logger.warning(
+                f"failed to generate cover text ideas, trying again... {i + 1}"
+            )
+
+    logger.success(f"completed: {len(ideas)} cover text ideas")
+    return ideas[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(

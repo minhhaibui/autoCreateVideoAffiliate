@@ -269,6 +269,7 @@ def build_affiliate_package_text(
     comment_replies=None,
     sound_ideas=None,
     stickers=None,
+    cover_ideas=None,
 ):
     """Assemble all generated affiliate assets into one plain-text document the
     user can download/keep. ``label`` maps section keys to translated headings so
@@ -341,6 +342,19 @@ def build_affiliate_package_text(
                 parts.append(f"   {label('sticker_purpose')}: {sticker['purpose']}")
             blocks.append("\n".join(parts))
         section(label("stickers"), "\n".join(blocks))
+
+    if cover_ideas:
+        blocks = []
+        for i, idea in enumerate(cover_ideas):
+            parts = [f"{i + 1}. {idea.get('text', '')}".rstrip()]
+            if idea.get("subtext"):
+                parts.append(f"   {label('cover_subtext')}: {idea['subtext']}")
+            if idea.get("angle"):
+                parts.append(f"   {label('cover_angle')}: {idea['angle']}")
+            if idea.get("tip"):
+                parts.append(f"   {label('cover_tip')}: {idea['tip']}")
+            blocks.append("\n".join(parts))
+        section(label("covers"), "\n".join(blocks))
 
     return "\n".join(lines).strip() + "\n"
 
@@ -1369,6 +1383,47 @@ with left_panel:
         elif "text_stickers" in st.session_state:
             st.info(tr("No Stickers"))
 
+    with st.container(border=True):
+        st.write(tr("Cover Text"))
+        st.caption(tr("Cover Text Hint"))
+        cover_amount = st.slider(
+            tr("Number of Covers"),
+            min_value=2,
+            max_value=llm.MAX_COVER_COUNT,
+            value=llm.DEFAULT_COVER_COUNT,
+            key="cover_amount",
+        )
+        if st.button(tr("Generate Cover Text"), key="auto_generate_covers"):
+            if not params.video_subject:
+                st.error(tr("Please Enter the Video Subject"))
+            else:
+                with st.spinner(tr("Generating Cover Text")):
+                    st.session_state["cover_ideas"] = llm.generate_cover_text_ideas(
+                        video_subject=params.video_subject,
+                        language=(
+                            params.video_language
+                            or st.session_state.get("ui_language", "")
+                        ),
+                        amount=cover_amount,
+                    )
+
+        cover_ideas = st.session_state.get("cover_ideas") or []
+        if cover_ideas:
+            for i, idea in enumerate(cover_ideas):
+                with st.expander(
+                    f"🖼️ {idea.get('text', '')}",
+                    expanded=(i == 0),
+                ):
+                    if idea.get("subtext"):
+                        st.markdown(f"**{tr('Cover Subtext')}:** {idea['subtext']}")
+                    if idea.get("angle"):
+                        st.markdown(f"**{tr('Cover Angle')}:** {idea['angle']}")
+                    if idea.get("tip"):
+                        st.markdown(f"**{tr('Cover Tip')}:** {idea['tip']}")
+            st.caption(tr("Cover Text Use Hint"))
+        elif "cover_ideas" in st.session_state:
+            st.info(tr("No Cover Text"))
+
     # Export helper: bundle every generated asset (subject, hooks, script,
     # keywords, caption, hashtags) into one text file so creators can archive
     # their copy or move it into a publishing tool in a single click.
@@ -1397,6 +1452,10 @@ with left_panel:
             "sticker_timing": tr("Sticker Timing"),
             "sticker_style": tr("Sticker Style"),
             "sticker_purpose": tr("Sticker Purpose"),
+            "covers": tr("Cover Text"),
+            "cover_subtext": tr("Cover Subtext"),
+            "cover_angle": tr("Cover Angle"),
+            "cover_tip": tr("Cover Tip"),
         }
         package_text = build_affiliate_package_text(
             subject=params.video_subject,
@@ -1408,6 +1467,7 @@ with left_panel:
             comment_replies=st.session_state.get("comment_replies") or [],
             sound_ideas=st.session_state.get("sound_ideas") or [],
             stickers=st.session_state.get("text_stickers") or [],
+            cover_ideas=st.session_state.get("cover_ideas") or [],
             label=lambda key: _section_labels.get(key, key),
         )
         has_content = bool(package_text.strip())

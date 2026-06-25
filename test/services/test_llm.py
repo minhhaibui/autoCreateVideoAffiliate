@@ -1201,6 +1201,70 @@ class TestTextStickers(unittest.TestCase):
             self.assertEqual(llm.generate_text_stickers(video_subject="x"), [])
 
 
+class TestCoverTextIdeas(unittest.TestCase):
+    """TikTok 带货 cover / thumbnail 标题生成。"""
+
+    def test_generate_cover_text_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "text": "I was wrong about this",
+                    "subtext": "honest review",
+                    "angle": "curiosity",
+                    "tip": "use a surprised-face frame",
+                },
+                {
+                    "text": "Under $20?!",
+                    "subtext": "",
+                    "angle": "benefit",
+                    "tip": "bright high-contrast frame",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            ideas = llm.generate_cover_text_ideas(
+                video_subject="mini blender", language="English"
+            )
+
+        self.assertEqual(len(ideas), 2)
+        self.assertEqual(ideas[0]["text"], "I was wrong about this")
+        for idea in ideas:
+            self.assertEqual(set(idea.keys()), set(llm.COVER_KEYS))
+
+    def test_generate_cover_text_drops_items_without_text(self):
+        payload = json.dumps(
+            [
+                {"subtext": "no headline", "angle": "curiosity"},
+                "not a dict",
+                {"text": "3 reasons I switched", "angle": "social proof"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            ideas = llm.generate_cover_text_ideas(video_subject="x")
+
+        self.assertEqual(len(ideas), 1)
+        self.assertEqual(ideas[0]["text"], "3 reasons I switched")
+
+    def test_generate_cover_text_recovers_embedded_json(self):
+        payload = 'Options: [{"text": "Don\'t buy until you see this"}] ok'
+        with patch.object(llm, "_generate_response", return_value=payload):
+            ideas = llm.generate_cover_text_ideas(video_subject="x")
+
+        self.assertEqual(len(ideas), 1)
+        self.assertEqual(ideas[0]["text"], "Don't buy until you see this")
+
+    def test_generate_cover_text_clamps_amount(self):
+        self.assertEqual(llm._normalize_cover_count(999), llm.MAX_COVER_COUNT)
+        self.assertEqual(llm._normalize_cover_count(0), 1)
+        self.assertEqual(llm._normalize_cover_count("bad"), llm.DEFAULT_COVER_COUNT)
+
+    def test_generate_cover_text_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(llm.generate_cover_text_ideas(video_subject="x"), [])
+
+
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
 FOUNDRY_BASE = "https://amanrai-test-resource.services.ai.azure.com/anthropic"
 FOUNDRY_MODEL = "azure_ai/claude-sonnet-4-6"
