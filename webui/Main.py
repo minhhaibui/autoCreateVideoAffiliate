@@ -270,6 +270,7 @@ def build_affiliate_package_text(
     sound_ideas=None,
     stickers=None,
     cover_ideas=None,
+    schedule_slots=None,
 ):
     """Assemble all generated affiliate assets into one plain-text document the
     user can download/keep. ``label`` maps section keys to translated headings so
@@ -355,6 +356,20 @@ def build_affiliate_package_text(
                 parts.append(f"   {label('cover_tip')}: {idea['tip']}")
             blocks.append("\n".join(parts))
         section(label("covers"), "\n".join(blocks))
+
+    if schedule_slots:
+        blocks = []
+        for i, slot in enumerate(schedule_slots):
+            head = " — ".join(
+                p for p in [slot.get("slot", ""), slot.get("time", "")] if p
+            )
+            parts = [f"{i + 1}. {head}".rstrip()]
+            if slot.get("day"):
+                parts.append(f"   {label('schedule_day')}: {slot['day']}")
+            if slot.get("why"):
+                parts.append(f"   {label('schedule_why')}: {slot['why']}")
+            blocks.append("\n".join(parts))
+        section(label("schedule"), "\n".join(blocks))
 
     return "\n".join(lines).strip() + "\n"
 
@@ -1424,6 +1439,51 @@ with left_panel:
         elif "cover_ideas" in st.session_state:
             st.info(tr("No Cover Text"))
 
+    with st.container(border=True):
+        st.write(tr("Posting Schedule"))
+        st.caption(tr("Posting Schedule Hint"))
+        schedule_region = st.text_input(
+            tr("Audience Region"),
+            key="schedule_region",
+            placeholder=tr("Audience Region Placeholder"),
+        )
+        schedule_amount = st.slider(
+            tr("Number of Slots"),
+            min_value=2,
+            max_value=llm.MAX_SCHEDULE_COUNT,
+            value=llm.DEFAULT_SCHEDULE_COUNT,
+            key="schedule_amount",
+        )
+        if st.button(tr("Suggest Posting Times"), key="auto_generate_schedule"):
+            if not params.video_subject:
+                st.error(tr("Please Enter the Video Subject"))
+            else:
+                with st.spinner(tr("Generating Posting Schedule")):
+                    st.session_state["schedule_slots"] = llm.generate_posting_schedule(
+                        video_subject=params.video_subject,
+                        language=(
+                            params.video_language
+                            or st.session_state.get("ui_language", "")
+                        ),
+                        audience_region=schedule_region,
+                        amount=schedule_amount,
+                    )
+
+        schedule_slots = st.session_state.get("schedule_slots") or []
+        if schedule_slots:
+            for i, slot in enumerate(schedule_slots):
+                header = " — ".join(
+                    p for p in [slot.get("slot", ""), slot.get("time", "")] if p
+                )
+                with st.expander(f"🕒 {header}", expanded=(i == 0)):
+                    if slot.get("day"):
+                        st.markdown(f"**{tr('Schedule Day')}:** {slot['day']}")
+                    if slot.get("why"):
+                        st.markdown(f"**{tr('Schedule Why')}:** {slot['why']}")
+            st.caption(tr("Posting Schedule Use Hint"))
+        elif "schedule_slots" in st.session_state:
+            st.info(tr("No Posting Schedule"))
+
     # Export helper: bundle every generated asset (subject, hooks, script,
     # keywords, caption, hashtags) into one text file so creators can archive
     # their copy or move it into a publishing tool in a single click.
@@ -1456,6 +1516,9 @@ with left_panel:
             "cover_subtext": tr("Cover Subtext"),
             "cover_angle": tr("Cover Angle"),
             "cover_tip": tr("Cover Tip"),
+            "schedule": tr("Posting Schedule"),
+            "schedule_day": tr("Schedule Day"),
+            "schedule_why": tr("Schedule Why"),
         }
         package_text = build_affiliate_package_text(
             subject=params.video_subject,
@@ -1468,6 +1531,7 @@ with left_panel:
             sound_ideas=st.session_state.get("sound_ideas") or [],
             stickers=st.session_state.get("text_stickers") or [],
             cover_ideas=st.session_state.get("cover_ideas") or [],
+            schedule_slots=st.session_state.get("schedule_slots") or [],
             label=lambda key: _section_labels.get(key, key),
         )
         has_content = bool(package_text.strip())

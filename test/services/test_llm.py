@@ -1265,6 +1265,74 @@ class TestCoverTextIdeas(unittest.TestCase):
             self.assertEqual(llm.generate_cover_text_ideas(video_subject="x"), [])
 
 
+class TestPostingSchedule(unittest.TestCase):
+    """TikTok 带货发布时间建议生成。"""
+
+    def test_generate_posting_schedule_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "slot": "Prime evening",
+                    "day": "Weekdays",
+                    "time": "7:00-9:00 PM",
+                    "why": "shoppers browse after work",
+                },
+                {
+                    "slot": "Lunch break",
+                    "day": "Every day",
+                    "time": "12:00-1:00 PM",
+                    "why": "midday scroll",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            slots = llm.generate_posting_schedule(
+                video_subject="mini blender",
+                language="English",
+                audience_region="Vietnam",
+            )
+
+        self.assertEqual(len(slots), 2)
+        self.assertEqual(slots[0]["slot"], "Prime evening")
+        for slot in slots:
+            self.assertEqual(set(slot.keys()), set(llm.SCHEDULE_KEYS))
+
+    def test_generate_posting_schedule_drops_items_without_time(self):
+        payload = json.dumps(
+            [
+                {"slot": "no time", "day": "Mon", "why": "dropped"},
+                "not a dict",
+                {"slot": "Evening", "time": "8 PM"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            slots = llm.generate_posting_schedule(video_subject="x")
+
+        self.assertEqual(len(slots), 1)
+        self.assertEqual(slots[0]["time"], "8 PM")
+
+    def test_generate_posting_schedule_recovers_embedded_json(self):
+        payload = 'Here: [{"time": "9:00-10:00 PM"}] thanks'
+        with patch.object(llm, "_generate_response", return_value=payload):
+            slots = llm.generate_posting_schedule(video_subject="x")
+
+        self.assertEqual(len(slots), 1)
+        self.assertEqual(slots[0]["time"], "9:00-10:00 PM")
+
+    def test_generate_posting_schedule_clamps_amount(self):
+        self.assertEqual(llm._normalize_schedule_count(999), llm.MAX_SCHEDULE_COUNT)
+        self.assertEqual(llm._normalize_schedule_count(0), 1)
+        self.assertEqual(
+            llm._normalize_schedule_count("bad"), llm.DEFAULT_SCHEDULE_COUNT
+        )
+
+    def test_generate_posting_schedule_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(llm.generate_posting_schedule(video_subject="x"), [])
+
+
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
 FOUNDRY_BASE = "https://amanrai-test-resource.services.ai.azure.com/anthropic"
 FOUNDRY_MODEL = "azure_ai/claude-sonnet-4-6"

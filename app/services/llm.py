@@ -1957,6 +1957,136 @@ Write {amount} cover (thumbnail) headline options for a short affiliate video ab
     return ideas[:amount]
 
 
+DEFAULT_SCHEDULE_COUNT = 4
+MAX_SCHEDULE_COUNT = 8
+MAX_SCHEDULE_FIELD_LENGTH = 200
+SCHEDULE_KEYS = ("slot", "day", "time", "why")
+
+
+def _normalize_schedule_count(amount) -> int:
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return DEFAULT_SCHEDULE_COUNT
+    return max(1, min(MAX_SCHEDULE_COUNT, amount))
+
+
+def _coerce_schedule_slot(item) -> dict:
+    """Normalize one LLM-returned posting-time slot into the fixed {key: str}
+    shape, dropping items that are not dicts or carry no time window."""
+    if not isinstance(item, dict):
+        return {}
+    slot = {}
+    for key in SCHEDULE_KEYS:
+        value = item.get(key, "")
+        slot[key] = _clamp_text(value, MAX_SCHEDULE_FIELD_LENGTH)
+    if not slot["time"]:
+        return {}
+    return slot
+
+
+def generate_posting_schedule(
+    video_subject: str,
+    language: str = "",
+    audience_region: str = "",
+    amount: int = DEFAULT_SCHEDULE_COUNT,
+) -> List[dict]:
+    """Suggest best-practice posting time windows for a TikTok affiliate video
+    about ``video_subject`` (optionally tuned to ``audience_region``).
+
+    Returns a list of dicts with the keys in SCHEDULE_KEYS (slot, day, time,
+    why). These are GENERAL best-practice patterns based on typical short-video
+    audience behaviour, NOT the creator's real analytics — the caller should tell
+    the user to confirm against their own TikTok analytics. On repeated failure an
+    empty list is returned so the caller can show a friendly message rather than
+    crash.
+    """
+    amount = _normalize_schedule_count(amount)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    audience_region = _limit_social_text(
+        audience_region, MAX_SOCIAL_SUBJECT_LENGTH, "audience_region"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "slot", "day", "time" and "why" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the subject."
+    )
+    region_line = (
+        f"Tune the windows to this audience region / timezone: {audience_region}."
+        if audience_region
+        else "Assume a general audience and give times in the creator's local time."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Posting-Time Advisor
+
+## Goals:
+Suggest {amount} best-practice posting time windows for a short affiliate video about "{video_subject}". {region_line}
+
+## Important:
+1. you CANNOT see the creator's real analytics, so give GENERAL best-practice windows based on typical short-video audience behaviour, and make clear these are starting points to test.
+2. base the windows on when shoppers usually browse (commute, lunch break, evening wind-down, weekend), and adapt to the subject/audience where it makes sense.
+3. give each window as a day grouping plus a clock time range; keep them clearly different and ordered from strongest to weakest.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "slot", "day", "time", "why".
+   - "slot": a short label for the window (e.g. Prime evening, Lunch break).
+   - "day": which days it applies to (e.g. Weekdays, Sat-Sun, Every day).
+   - "time": a clock time range (e.g. 7:00-9:00 PM).
+   - "why": one short reason this window tends to work for shoppers.
+3. {language_line}
+4. make the {amount} windows clearly different from each other.
+
+## Output Example:
+[{{"slot": "...", "day": "...", "time": "...", "why": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating posting schedule: subject={video_subject!r}, amount={amount}, "
+        f"region={audience_region!r}, language={language!r}"
+    )
+
+    slots: List[dict] = []
+    response = ""
+    for i in range(_max_retries):
+        try:
+            response = _generate_response(prompt)
+            if isinstance(response, str) and "Error: " in response:
+                logger.error(f"failed to generate posting schedule: {response}")
+                break
+            raw = json.loads(response)
+        except Exception as e:
+            logger.warning(f"failed to parse posting schedule: {str(e)}")
+            raw = None
+            if response:
+                match = re.search(r"\[.*]", response, re.DOTALL)
+                if match:
+                    try:
+                        raw = json.loads(match.group())
+                    except Exception as e:
+                        logger.warning(
+                            f"failed to parse posting schedule json: {str(e)}"
+                        )
+
+        if isinstance(raw, list):
+            slots = [s for s in (_coerce_schedule_slot(x) for x in raw) if s]
+
+        if slots:
+            break
+        if i < _max_retries - 1:
+            logger.warning(
+                f"failed to generate posting schedule, trying again... {i + 1}"
+            )
+
+    logger.success(f"completed: {len(slots)} posting schedule slots")
+    return slots[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(
