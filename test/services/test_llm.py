@@ -1135,6 +1135,72 @@ class TestSoundIdeas(unittest.TestCase):
             self.assertEqual(llm.generate_sound_ideas(video_subject="x"), [])
 
 
+class TestTextStickers(unittest.TestCase):
+    """TikTok 带货 on-screen text / sticker & CTA 生成。"""
+
+    def test_generate_text_stickers_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "text": "Wait for it...",
+                    "timing": "first 2 seconds",
+                    "style": "bold white top-center",
+                    "purpose": "hook",
+                },
+                {
+                    "text": "Tap the link in bio",
+                    "timing": "at the end",
+                    "style": "bold yellow, animated",
+                    "purpose": "call-to-action",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            stickers = llm.generate_text_stickers(
+                video_subject="mini blender", language="English"
+            )
+
+        self.assertEqual(len(stickers), 2)
+        self.assertEqual(stickers[0]["text"], "Wait for it...")
+        for sticker in stickers:
+            self.assertEqual(set(sticker.keys()), set(llm.STICKER_KEYS))
+
+    def test_generate_text_stickers_drops_items_without_text(self):
+        payload = json.dumps(
+            [
+                {"timing": "intro", "style": "bold"},
+                "not a dict",
+                {"text": "Buy it now", "purpose": "cta"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            stickers = llm.generate_text_stickers(video_subject="x")
+
+        self.assertEqual(len(stickers), 1)
+        self.assertEqual(stickers[0]["text"], "Buy it now")
+
+    def test_generate_text_stickers_recovers_embedded_json(self):
+        payload = 'Sure: [{"text": "Only 3 left"}] done'
+        with patch.object(llm, "_generate_response", return_value=payload):
+            stickers = llm.generate_text_stickers(video_subject="x")
+
+        self.assertEqual(len(stickers), 1)
+        self.assertEqual(stickers[0]["text"], "Only 3 left")
+
+    def test_generate_text_stickers_clamps_amount(self):
+        self.assertEqual(llm._normalize_sticker_count(999), llm.MAX_STICKER_COUNT)
+        self.assertEqual(llm._normalize_sticker_count(0), 1)
+        self.assertEqual(
+            llm._normalize_sticker_count("bad"), llm.DEFAULT_STICKER_COUNT
+        )
+
+    def test_generate_text_stickers_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(llm.generate_text_stickers(video_subject="x"), [])
+
+
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
 FOUNDRY_BASE = "https://amanrai-test-resource.services.ai.azure.com/anthropic"
 FOUNDRY_MODEL = "azure_ai/claude-sonnet-4-6"

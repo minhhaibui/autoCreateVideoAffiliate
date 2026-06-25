@@ -1720,6 +1720,122 @@ Suggest {amount} sound / music styles that would fit a short affiliate video abo
     return ideas[:amount]
 
 
+DEFAULT_STICKER_COUNT = 5
+MAX_STICKER_COUNT = 10
+MAX_STICKER_FIELD_LENGTH = 200
+STICKER_KEYS = ("text", "timing", "style", "purpose")
+
+
+def _normalize_sticker_count(amount) -> int:
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return DEFAULT_STICKER_COUNT
+    return max(1, min(MAX_STICKER_COUNT, amount))
+
+
+def _coerce_sticker_idea(item) -> dict:
+    """Normalize one LLM-returned text-sticker idea into the fixed {key: str}
+    shape, dropping items that are not dicts or carry no on-screen text."""
+    if not isinstance(item, dict):
+        return {}
+    idea = {}
+    for key in STICKER_KEYS:
+        value = item.get(key, "")
+        idea[key] = _clamp_text(value, MAX_STICKER_FIELD_LENGTH)
+    if not idea["text"]:
+        return {}
+    return idea
+
+
+def generate_text_stickers(
+    video_subject: str,
+    language: str = "",
+    amount: int = DEFAULT_STICKER_COUNT,
+) -> List[dict]:
+    """Suggest punchy on-screen text overlays / stickers and a clear call-to-action
+    for a short affiliate video about ``video_subject``.
+
+    Returns a list of dicts with the keys in STICKER_KEYS (text, timing, style,
+    purpose). Each item is an on-screen caption the creator can drop onto the
+    video, with when to show it, a quick visual-style hint, and why it helps. On
+    repeated failure an empty list is returned so the caller can show a friendly
+    message rather than crash.
+    """
+    amount = _normalize_sticker_count(amount)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "text", "timing", "style" and "purpose" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the subject."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate On-screen Text & CTA Writer
+
+## Goals:
+Write {amount} short on-screen text stickers (captions the creator overlays on the video) for a short affiliate video about "{video_subject}". Cover the full video arc: at least one scroll-stopping opener, one that builds desire or trust in the middle, and one strong call-to-action near the end.
+
+## Important:
+1. on-screen text must be VERY short and punchy — a few words, the way TikTok captions read; do not write full sentences or paragraphs.
+2. make at least one item an explicit call-to-action (e.g. tap the link, check the cart, comment a word) without inventing fake discounts, prices, or guarantees.
+3. do not promise specific results, medical claims, or anything you cannot back up; keep it honest.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "text", "timing", "style", "purpose".
+   - "text": the short on-screen caption itself.
+   - "timing": when in the video to show it (e.g. first 2 seconds, during the demo, at the end).
+   - "style": a quick visual styling hint (e.g. bold yellow top-center, small caption bottom).
+   - "purpose": one short note on what it does (hook, build trust, create urgency, call-to-action).
+3. {language_line}
+4. make the {amount} stickers clearly different from each other.
+
+## Output Example:
+[{{"text": "...", "timing": "...", "style": "...", "purpose": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating text stickers: subject={video_subject!r}, amount={amount}, "
+        f"language={language!r}"
+    )
+
+    stickers: List[dict] = []
+    response = ""
+    for i in range(_max_retries):
+        try:
+            response = _generate_response(prompt)
+            if isinstance(response, str) and "Error: " in response:
+                logger.error(f"failed to generate text stickers: {response}")
+                break
+            raw = json.loads(response)
+        except Exception as e:
+            logger.warning(f"failed to parse text stickers: {str(e)}")
+            raw = None
+            if response:
+                match = re.search(r"\[.*]", response, re.DOTALL)
+                if match:
+                    try:
+                        raw = json.loads(match.group())
+                    except Exception as e:
+                        logger.warning(f"failed to parse text stickers json: {str(e)}")
+
+        if isinstance(raw, list):
+            stickers = [s for s in (_coerce_sticker_idea(x) for x in raw) if s]
+
+        if stickers:
+            break
+        if i < _max_retries - 1:
+            logger.warning(f"failed to generate text stickers, trying again... {i + 1}")
+
+    logger.success(f"completed: {len(stickers)} text stickers")
+    return stickers[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(

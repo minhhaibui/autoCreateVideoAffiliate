@@ -268,6 +268,7 @@ def build_affiliate_package_text(
     shots=None,
     comment_replies=None,
     sound_ideas=None,
+    stickers=None,
 ):
     """Assemble all generated affiliate assets into one plain-text document the
     user can download/keep. ``label`` maps section keys to translated headings so
@@ -327,6 +328,19 @@ def build_affiliate_package_text(
                 parts.append(f"   {label('sound_tip')}: {idea['tip']}")
             blocks.append("\n".join(parts))
         section(label("sounds"), "\n".join(blocks))
+
+    if stickers:
+        blocks = []
+        for i, sticker in enumerate(stickers):
+            parts = [f"{i + 1}. {sticker.get('text', '')}".rstrip()]
+            if sticker.get("timing"):
+                parts.append(f"   {label('sticker_timing')}: {sticker['timing']}")
+            if sticker.get("style"):
+                parts.append(f"   {label('sticker_style')}: {sticker['style']}")
+            if sticker.get("purpose"):
+                parts.append(f"   {label('sticker_purpose')}: {sticker['purpose']}")
+            blocks.append("\n".join(parts))
+        section(label("stickers"), "\n".join(blocks))
 
     return "\n".join(lines).strip() + "\n"
 
@@ -1310,6 +1324,51 @@ with left_panel:
         elif "sound_ideas" in st.session_state:
             st.info(tr("No Sounds"))
 
+    with st.container(border=True):
+        st.write(tr("Text Stickers"))
+        st.caption(tr("Text Stickers Hint"))
+        sticker_amount = st.slider(
+            tr("Number of Stickers"),
+            min_value=3,
+            max_value=llm.MAX_STICKER_COUNT,
+            value=llm.DEFAULT_STICKER_COUNT,
+            key="sticker_amount",
+        )
+        if st.button(tr("Generate Stickers"), key="auto_generate_stickers"):
+            if not params.video_subject:
+                st.error(tr("Please Enter the Video Subject"))
+            else:
+                with st.spinner(tr("Generating Stickers")):
+                    st.session_state["text_stickers"] = llm.generate_text_stickers(
+                        video_subject=params.video_subject,
+                        language=(
+                            params.video_language
+                            or st.session_state.get("ui_language", "")
+                        ),
+                        amount=sticker_amount,
+                    )
+
+        text_stickers = st.session_state.get("text_stickers") or []
+        if text_stickers:
+            for i, sticker in enumerate(text_stickers):
+                with st.expander(
+                    f"💬 {sticker.get('text', '')}",
+                    expanded=(i == 0),
+                ):
+                    if sticker.get("timing"):
+                        st.markdown(
+                            f"**{tr('Sticker Timing')}:** {sticker['timing']}"
+                        )
+                    if sticker.get("style"):
+                        st.markdown(f"**{tr('Sticker Style')}:** {sticker['style']}")
+                    if sticker.get("purpose"):
+                        st.markdown(
+                            f"**{tr('Sticker Purpose')}:** {sticker['purpose']}"
+                        )
+            st.caption(tr("Text Stickers Use Hint"))
+        elif "text_stickers" in st.session_state:
+            st.info(tr("No Stickers"))
+
     # Export helper: bundle every generated asset (subject, hooks, script,
     # keywords, caption, hashtags) into one text file so creators can archive
     # their copy or move it into a publishing tool in a single click.
@@ -1334,6 +1393,10 @@ with left_panel:
             "sound_vibe": tr("Sound Vibe"),
             "sound_search": tr("Sound Search"),
             "sound_tip": tr("Sound Tip"),
+            "stickers": tr("Text Stickers"),
+            "sticker_timing": tr("Sticker Timing"),
+            "sticker_style": tr("Sticker Style"),
+            "sticker_purpose": tr("Sticker Purpose"),
         }
         package_text = build_affiliate_package_text(
             subject=params.video_subject,
@@ -1344,6 +1407,7 @@ with left_panel:
             shots=st.session_state.get("video_shots") or [],
             comment_replies=st.session_state.get("comment_replies") or [],
             sound_ideas=st.session_state.get("sound_ideas") or [],
+            stickers=st.session_state.get("text_stickers") or [],
             label=lambda key: _section_labels.get(key, key),
         )
         has_content = bool(package_text.strip())
