@@ -1115,6 +1115,49 @@ def _coerce_product_idea(item) -> dict:
     return idea
 
 
+def _generate_json_object_list(prompt: str, coerce, label: str) -> List[dict]:
+    """Shared retry loop for the affiliate generators that expect a JSON array of
+    objects back from the LLM.
+
+    Calls the model up to ``_max_retries`` times, parsing the response as a JSON
+    array (recovering an array embedded in surrounding prose when needed), maps
+    each element through ``coerce`` and drops falsy results. ``label`` is only
+    used in log messages. Returns the cleaned list (NOT truncated — the caller
+    applies its own ``[:amount]``). Returns [] if the model reports an
+    ``Error: ...`` or every attempt fails to yield items.
+    """
+    items: List[dict] = []
+    response = ""
+    for i in range(_max_retries):
+        try:
+            response = _generate_response(prompt)
+            if isinstance(response, str) and "Error: " in response:
+                logger.error(f"failed to generate {label}: {response}")
+                break
+            raw = json.loads(response)
+        except Exception as e:
+            logger.warning(f"failed to parse {label}: {str(e)}")
+            raw = None
+            if response:
+                match = re.search(r"\[.*]", response, re.DOTALL)
+                if match:
+                    try:
+                        raw = json.loads(match.group())
+                    except Exception as e:
+                        logger.warning(f"failed to parse {label} json: {str(e)}")
+
+        if isinstance(raw, list):
+            items = [item for item in (coerce(x) for x in raw) if item]
+
+        if items:
+            break
+        if i < _max_retries - 1:
+            logger.warning(f"failed to generate {label}, trying again... {i + 1}")
+
+    logger.success(f"completed: {len(items)} {label}")
+    return items
+
+
 def generate_product_ideas(
     category: str = "",
     market: str = "",
@@ -1176,35 +1219,7 @@ Suggest {amount} product ideas that tend to sell well for TikTok affiliate marke
         f"generating product ideas: category={category!r}, market={market!r}, amount={amount}"
     )
 
-    ideas: List[dict] = []
-    response = ""
-    for i in range(_max_retries):
-        try:
-            response = _generate_response(prompt)
-            if isinstance(response, str) and "Error: " in response:
-                logger.error(f"failed to generate product ideas: {response}")
-                break
-            raw = json.loads(response)
-        except Exception as e:
-            logger.warning(f"failed to parse product ideas: {str(e)}")
-            raw = None
-            if response:
-                match = re.search(r"\[.*]", response, re.DOTALL)
-                if match:
-                    try:
-                        raw = json.loads(match.group())
-                    except Exception as e:
-                        logger.warning(f"failed to parse product ideas json: {str(e)}")
-
-        if isinstance(raw, list):
-            ideas = [idea for idea in (_coerce_product_idea(x) for x in raw) if idea]
-
-        if ideas:
-            break
-        if i < _max_retries - 1:
-            logger.warning(f"failed to generate product ideas, trying again... {i + 1}")
-
-    logger.success(f"completed: {len(ideas)} product ideas")
+    ideas = _generate_json_object_list(prompt, _coerce_product_idea, "product ideas")
     return ideas[:amount]
 
 
@@ -1436,35 +1451,7 @@ Turn a short affiliate video about "{video_subject}" into a clear shot-by-shot s
         f"has_script={bool(video_script)}, language={language!r}"
     )
 
-    shots: List[dict] = []
-    response = ""
-    for i in range(_max_retries):
-        try:
-            response = _generate_response(prompt)
-            if isinstance(response, str) and "Error: " in response:
-                logger.error(f"failed to generate shot list: {response}")
-                break
-            raw = json.loads(response)
-        except Exception as e:
-            logger.warning(f"failed to parse shot list: {str(e)}")
-            raw = None
-            if response:
-                match = re.search(r"\[.*]", response, re.DOTALL)
-                if match:
-                    try:
-                        raw = json.loads(match.group())
-                    except Exception as e:
-                        logger.warning(f"failed to parse shot list json: {str(e)}")
-
-        if isinstance(raw, list):
-            shots = [shot for shot in (_coerce_shot(x) for x in raw) if shot]
-
-        if shots:
-            break
-        if i < _max_retries - 1:
-            logger.warning(f"failed to generate shot list, trying again... {i + 1}")
-
-    logger.success(f"completed: {len(shots)} shots")
+    shots = _generate_json_object_list(prompt, _coerce_shot, "shots")
     return shots[:amount]
 
 
@@ -1558,41 +1545,9 @@ Predict {amount} of the most common comments viewers leave on a short affiliate 
         f"language={language!r}"
     )
 
-    replies: List[dict] = []
-    response = ""
-    for i in range(_max_retries):
-        try:
-            response = _generate_response(prompt)
-            if isinstance(response, str) and "Error: " in response:
-                logger.error(f"failed to generate comment replies: {response}")
-                break
-            raw = json.loads(response)
-        except Exception as e:
-            logger.warning(f"failed to parse comment replies: {str(e)}")
-            raw = None
-            if response:
-                match = re.search(r"\[.*]", response, re.DOTALL)
-                if match:
-                    try:
-                        raw = json.loads(match.group())
-                    except Exception as e:
-                        logger.warning(
-                            f"failed to parse comment replies json: {str(e)}"
-                        )
-
-        if isinstance(raw, list):
-            replies = [
-                pair for pair in (_coerce_comment_reply(x) for x in raw) if pair
-            ]
-
-        if replies:
-            break
-        if i < _max_retries - 1:
-            logger.warning(
-                f"failed to generate comment replies, trying again... {i + 1}"
-            )
-
-    logger.success(f"completed: {len(replies)} comment replies")
+    replies = _generate_json_object_list(
+        prompt, _coerce_comment_reply, "comment replies"
+    )
     return replies[:amount]
 
 
@@ -1688,35 +1643,7 @@ Suggest {amount} sound / music styles that would fit a short affiliate video abo
         f"language={language!r}"
     )
 
-    ideas: List[dict] = []
-    response = ""
-    for i in range(_max_retries):
-        try:
-            response = _generate_response(prompt)
-            if isinstance(response, str) and "Error: " in response:
-                logger.error(f"failed to generate sound ideas: {response}")
-                break
-            raw = json.loads(response)
-        except Exception as e:
-            logger.warning(f"failed to parse sound ideas: {str(e)}")
-            raw = None
-            if response:
-                match = re.search(r"\[.*]", response, re.DOTALL)
-                if match:
-                    try:
-                        raw = json.loads(match.group())
-                    except Exception as e:
-                        logger.warning(f"failed to parse sound ideas json: {str(e)}")
-
-        if isinstance(raw, list):
-            ideas = [idea for idea in (_coerce_sound_idea(x) for x in raw) if idea]
-
-        if ideas:
-            break
-        if i < _max_retries - 1:
-            logger.warning(f"failed to generate sound ideas, trying again... {i + 1}")
-
-    logger.success(f"completed: {len(ideas)} sound ideas")
+    ideas = _generate_json_object_list(prompt, _coerce_sound_idea, "sound ideas")
     return ideas[:amount]
 
 
@@ -1804,35 +1731,9 @@ Write {amount} short on-screen text stickers (captions the creator overlays on t
         f"language={language!r}"
     )
 
-    stickers: List[dict] = []
-    response = ""
-    for i in range(_max_retries):
-        try:
-            response = _generate_response(prompt)
-            if isinstance(response, str) and "Error: " in response:
-                logger.error(f"failed to generate text stickers: {response}")
-                break
-            raw = json.loads(response)
-        except Exception as e:
-            logger.warning(f"failed to parse text stickers: {str(e)}")
-            raw = None
-            if response:
-                match = re.search(r"\[.*]", response, re.DOTALL)
-                if match:
-                    try:
-                        raw = json.loads(match.group())
-                    except Exception as e:
-                        logger.warning(f"failed to parse text stickers json: {str(e)}")
-
-        if isinstance(raw, list):
-            stickers = [s for s in (_coerce_sticker_idea(x) for x in raw) if s]
-
-        if stickers:
-            break
-        if i < _max_retries - 1:
-            logger.warning(f"failed to generate text stickers, trying again... {i + 1}")
-
-    logger.success(f"completed: {len(stickers)} text stickers")
+    stickers = _generate_json_object_list(
+        prompt, _coerce_sticker_idea, "text stickers"
+    )
     return stickers[:amount]
 
 
@@ -1921,39 +1822,7 @@ Write {amount} cover (thumbnail) headline options for a short affiliate video ab
         f"language={language!r}"
     )
 
-    ideas: List[dict] = []
-    response = ""
-    for i in range(_max_retries):
-        try:
-            response = _generate_response(prompt)
-            if isinstance(response, str) and "Error: " in response:
-                logger.error(f"failed to generate cover text ideas: {response}")
-                break
-            raw = json.loads(response)
-        except Exception as e:
-            logger.warning(f"failed to parse cover text ideas: {str(e)}")
-            raw = None
-            if response:
-                match = re.search(r"\[.*]", response, re.DOTALL)
-                if match:
-                    try:
-                        raw = json.loads(match.group())
-                    except Exception as e:
-                        logger.warning(
-                            f"failed to parse cover text ideas json: {str(e)}"
-                        )
-
-        if isinstance(raw, list):
-            ideas = [idea for idea in (_coerce_cover_idea(x) for x in raw) if idea]
-
-        if ideas:
-            break
-        if i < _max_retries - 1:
-            logger.warning(
-                f"failed to generate cover text ideas, trying again... {i + 1}"
-            )
-
-    logger.success(f"completed: {len(ideas)} cover text ideas")
+    ideas = _generate_json_object_list(prompt, _coerce_cover_idea, "cover text ideas")
     return ideas[:amount]
 
 
@@ -2051,39 +1920,9 @@ Suggest {amount} best-practice posting time windows for a short affiliate video 
         f"region={audience_region!r}, language={language!r}"
     )
 
-    slots: List[dict] = []
-    response = ""
-    for i in range(_max_retries):
-        try:
-            response = _generate_response(prompt)
-            if isinstance(response, str) and "Error: " in response:
-                logger.error(f"failed to generate posting schedule: {response}")
-                break
-            raw = json.loads(response)
-        except Exception as e:
-            logger.warning(f"failed to parse posting schedule: {str(e)}")
-            raw = None
-            if response:
-                match = re.search(r"\[.*]", response, re.DOTALL)
-                if match:
-                    try:
-                        raw = json.loads(match.group())
-                    except Exception as e:
-                        logger.warning(
-                            f"failed to parse posting schedule json: {str(e)}"
-                        )
-
-        if isinstance(raw, list):
-            slots = [s for s in (_coerce_schedule_slot(x) for x in raw) if s]
-
-        if slots:
-            break
-        if i < _max_retries - 1:
-            logger.warning(
-                f"failed to generate posting schedule, trying again... {i + 1}"
-            )
-
-    logger.success(f"completed: {len(slots)} posting schedule slots")
+    slots = _generate_json_object_list(
+        prompt, _coerce_schedule_slot, "posting schedule"
+    )
     return slots[:amount]
 
 
