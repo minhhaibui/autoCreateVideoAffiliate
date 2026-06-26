@@ -2019,6 +2019,98 @@ Write {amount} options for the creator's OWN first comment to pin to the top of 
     return pinned[:amount]
 
 
+DEFAULT_DISCLOSURE_COUNT = 3
+MAX_DISCLOSURE_COUNT = 6
+MAX_DISCLOSURE_FIELD_LENGTH = 300
+DISCLOSURE_KEYS = ("line", "placement", "note")
+
+
+def _normalize_disclosure_count(amount) -> int:
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return DEFAULT_DISCLOSURE_COUNT
+    return max(1, min(MAX_DISCLOSURE_COUNT, amount))
+
+
+def _coerce_disclosure_line(item) -> dict:
+    """Normalize one LLM-returned affiliate-disclosure option into the fixed
+    {key: str} shape, dropping items that are not dicts or carry no line text."""
+    if not isinstance(item, dict):
+        return {}
+    disclosure = {}
+    for key in DISCLOSURE_KEYS:
+        value = item.get(key, "")
+        disclosure[key] = _clamp_text(value, MAX_DISCLOSURE_FIELD_LENGTH)
+    if not disclosure["line"]:
+        return {}
+    return disclosure
+
+
+def generate_disclosure_lines(
+    video_subject: str,
+    language: str = "",
+    amount: int = DEFAULT_DISCLOSURE_COUNT,
+) -> List[dict]:
+    """Write ready-to-use affiliate / sponsorship DISCLOSURE lines for a short
+    video about ``video_subject``. Affiliate and paid content must be disclosed
+    (FTC guidance and TikTok/YouTube/Instagram policy), and creators often skip
+    or bury it; these give clear, honest options to paste into the caption, an
+    on-screen label, the pinned comment, or the spoken intro.
+
+    Returns a list of dicts with the keys in DISCLOSURE_KEYS (line, placement,
+    note). ``line`` is the disclosure text, ``placement`` where to use it, and
+    ``note`` a short compliance reminder. On repeated failure an empty list is
+    returned so the caller can show a friendly message rather than crash.
+    """
+    amount = _normalize_disclosure_count(amount)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "line", "placement" and "note" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the subject."
+    )
+
+    prompt = f"""
+# Role: Short-Video Affiliate Disclosure & Compliance Writer
+
+## Goals:
+Write {amount} ready-to-use affiliate / paid-partnership DISCLOSURE options for a short affiliate video about "{video_subject}". Creators must clearly disclose that they earn from the links, and these should be honest, plain, and easy to paste.
+
+## Important:
+1. each "line" must be a clear, conspicuous disclosure a viewer easily understands (e.g. mentions affiliate link / commission / paid partnership / #ad). Do NOT hide or soften the fact that it is sponsored/affiliate.
+2. cover a range of placements so the creator can pick: caption text, an on-screen label in the first seconds, the spoken intro, and the pinned comment.
+3. keep it short, natural and honest — no fake urgency, fake discounts, or claims about results; disclosure is about transparency, not a sales pitch.
+4. include a common hashtag form where natural (e.g. #ad, #affiliate), but the written/spoken sentence must stand on its own without relying only on a hashtag.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "line", "placement", "note".
+   - "line": the disclosure text to use.
+   - "placement": where to put it (e.g. Caption, On-screen first 3s, Spoken intro, Pinned comment).
+   - "note": one short compliance reminder (e.g. keep it visible, say it out loud, don't bury it).
+3. {language_line}
+4. make the {amount} options clearly different in wording and placement.
+
+## Output Example:
+[{{"line": "...", "placement": "...", "note": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating disclosure lines: subject={video_subject!r}, amount={amount}, "
+        f"language={language!r}"
+    )
+
+    lines = _generate_json_object_list(
+        prompt, _coerce_disclosure_line, "disclosure lines"
+    )
+    return lines[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(

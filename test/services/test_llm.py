@@ -1401,6 +1401,73 @@ class TestPinnedComments(unittest.TestCase):
             self.assertEqual(llm.generate_pinned_comments(video_subject="x"), [])
 
 
+class TestDisclosureLines(unittest.TestCase):
+    """带货合规免责声明生成。"""
+
+    def test_generate_disclosure_lines_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "line": "This video uses affiliate links — I may earn a commission. #ad",
+                    "placement": "Caption",
+                    "note": "keep it visible",
+                },
+                {
+                    "line": "Heads up: paid partnership.",
+                    "placement": "Spoken intro",
+                    "note": "say it out loud",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            lines = llm.generate_disclosure_lines(
+                video_subject="mini blender",
+                language="English",
+            )
+
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[0]["line"].startswith("This video uses affiliate"))
+        for item in lines:
+            self.assertEqual(set(item.keys()), set(llm.DISCLOSURE_KEYS))
+
+    def test_generate_disclosure_lines_drops_items_without_line(self):
+        payload = json.dumps(
+            [
+                {"placement": "Caption", "note": "dropped"},
+                "not a dict",
+                {"line": "#ad — affiliate links below", "placement": "Caption"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            lines = llm.generate_disclosure_lines(video_subject="x")
+
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["line"], "#ad — affiliate links below")
+
+    def test_generate_disclosure_lines_recovers_embedded_json(self):
+        payload = 'Sure: [{"line": "Contains affiliate links #ad"}] done'
+        with patch.object(llm, "_generate_response", return_value=payload):
+            lines = llm.generate_disclosure_lines(video_subject="x")
+
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["line"], "Contains affiliate links #ad")
+
+    def test_generate_disclosure_lines_clamps_amount(self):
+        self.assertEqual(
+            llm._normalize_disclosure_count(999), llm.MAX_DISCLOSURE_COUNT
+        )
+        self.assertEqual(llm._normalize_disclosure_count(0), 1)
+        self.assertEqual(
+            llm._normalize_disclosure_count("bad"), llm.DEFAULT_DISCLOSURE_COUNT
+        )
+
+    def test_generate_disclosure_lines_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(llm.generate_disclosure_lines(video_subject="x"), [])
+
+
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
 FOUNDRY_BASE = "https://amanrai-test-resource.services.ai.azure.com/anthropic"
 FOUNDRY_MODEL = "azure_ai/claude-sonnet-4-6"

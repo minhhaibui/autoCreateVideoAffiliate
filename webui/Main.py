@@ -1274,6 +1274,57 @@ with left_panel:
             elif "pinned_comments" in st.session_state:
                 st.info(tr("No Pinned Comments"))
 
+        # Affiliate disclosure / compliance helper. Affiliate and paid content
+        # must be disclosed clearly (FTC + platform policy); creators often skip
+        # or bury it. Generate honest, ready-to-paste disclosure lines.
+        with st.container(border=True):
+            st.write(tr("Affiliate Disclosure"))
+            st.caption(tr("Affiliate Disclosure Hint"))
+            disclosure_amount = st.slider(
+                tr("Number of Disclosures"),
+                min_value=1,
+                max_value=llm.MAX_DISCLOSURE_COUNT,
+                value=llm.DEFAULT_DISCLOSURE_COUNT,
+                key="disclosure_amount",
+            )
+            if st.button(tr("Generate Disclosure"), key="auto_generate_disclosure"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Disclosure")):
+                        st.session_state["disclosure_lines"] = llm.generate_disclosure_lines(
+                            video_subject=params.video_subject,
+                            language=(
+                                params.video_language
+                                or st.session_state.get("ui_language", "")
+                            ),
+                            amount=disclosure_amount,
+                        )
+
+            disclosure_lines = st.session_state.get("disclosure_lines") or []
+            if disclosure_lines:
+                for i, item in enumerate(disclosure_lines):
+                    with st.expander(
+                        f"⚖️ {item.get('placement', '') or tr('Affiliate Disclosure')}",
+                        expanded=(i == 0),
+                    ):
+                        st.text_area(
+                            tr("Affiliate Disclosure"),
+                            value=item.get("line", ""),
+                            key=f"disclosure_line_{i}",
+                            height=80,
+                            label_visibility="collapsed",
+                        )
+                        if item.get("placement"):
+                            st.markdown(
+                                f"**{tr('Disclosure Placement')}:** {item['placement']}"
+                            )
+                        if item.get("note"):
+                            st.markdown(f"**{tr('Disclosure Note')}:** {item['note']}")
+                st.caption(tr("Affiliate Disclosure Use Hint"))
+            elif "disclosure_lines" in st.session_state:
+                st.info(tr("No Disclosure"))
+
     with toolkit_tabs[2]:
         # Trending-sound helper. Music choice strongly affects a TikTok's reach, but
         # creators often don't know what to put on. This suggests sound STYLES plus a
@@ -1445,6 +1496,9 @@ with left_panel:
                 "pinned_comments": tr("Pinned Comment"),
                 "pinned_cta": tr("Pinned CTA"),
                 "pinned_tip": tr("Pinned Tip"),
+                "disclosure": tr("Affiliate Disclosure"),
+                "disclosure_placement": tr("Disclosure Placement"),
+                "disclosure_note": tr("Disclosure Note"),
             }
             package_text = build_affiliate_package_text(
                 subject=params.video_subject,
@@ -1459,6 +1513,7 @@ with left_panel:
                 cover_ideas=st.session_state.get("cover_ideas") or [],
                 schedule_slots=st.session_state.get("schedule_slots") or [],
                 pinned_comments=st.session_state.get("pinned_comments") or [],
+                disclosure_lines=st.session_state.get("disclosure_lines") or [],
                 label=lambda key: _section_labels.get(key, key),
             )
             has_content = bool(package_text.strip())

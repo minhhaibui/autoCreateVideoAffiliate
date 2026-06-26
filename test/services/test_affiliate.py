@@ -129,6 +129,25 @@ class TestBuildAffiliatePackageText(unittest.TestCase):
         self.assertNotIn("pinned_cta:", out)
         self.assertNotIn("pinned_tip:", out)
 
+    def test_disclosure_lines(self):
+        disclosure = [
+            {
+                "line": "Contains affiliate links #ad",
+                "placement": "Caption",
+                "note": "keep it visible",
+            }
+        ]
+        out = _build(disclosure_lines=disclosure)
+        self.assertIn("1. Contains affiliate links #ad", out)
+        self.assertIn("disclosure_placement: Caption", out)
+        self.assertIn("disclosure_note: keep it visible", out)
+
+    def test_disclosure_lines_omit_missing_subfields(self):
+        out = _build(disclosure_lines=[{"line": "#ad"}])
+        self.assertIn("1. #ad", out)
+        self.assertNotIn("disclosure_placement:", out)
+        self.assertNotIn("disclosure_note:", out)
+
     def test_label_callable_translates_headings(self):
         out = build_affiliate_package_text(
             subject="X",
