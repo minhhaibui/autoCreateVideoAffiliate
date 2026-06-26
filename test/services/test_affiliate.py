@@ -110,6 +110,25 @@ class TestBuildAffiliatePackageText(unittest.TestCase):
         self.assertIn("schedule_day: Weekdays", out)
         self.assertIn("schedule_why: after-work scroll", out)
 
+    def test_pinned_comments(self):
+        pinned = [
+            {
+                "comment": "Where to buy? 👇",
+                "cta": "Link in bio 👆",
+                "tip": "link drop",
+            }
+        ]
+        out = _build(pinned_comments=pinned)
+        self.assertIn("1. Where to buy? 👇", out)
+        self.assertIn("pinned_cta: Link in bio 👆", out)
+        self.assertIn("pinned_tip: link drop", out)
+
+    def test_pinned_comments_omit_missing_subfields(self):
+        out = _build(pinned_comments=[{"comment": "Pin me"}])
+        self.assertIn("1. Pin me", out)
+        self.assertNotIn("pinned_cta:", out)
+        self.assertNotIn("pinned_tip:", out)
+
     def test_label_callable_translates_headings(self):
         out = build_affiliate_package_text(
             subject="X",

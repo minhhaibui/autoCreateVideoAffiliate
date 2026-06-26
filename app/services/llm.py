@@ -1926,6 +1926,99 @@ Suggest {amount} best-practice posting time windows for a short affiliate video 
     return slots[:amount]
 
 
+DEFAULT_PINNED_COMMENT_COUNT = 4
+MAX_PINNED_COMMENT_COUNT = 8
+MAX_PINNED_COMMENT_FIELD_LENGTH = 300
+PINNED_COMMENT_KEYS = ("comment", "cta", "tip")
+
+
+def _normalize_pinned_comment_count(amount) -> int:
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return DEFAULT_PINNED_COMMENT_COUNT
+    return max(1, min(MAX_PINNED_COMMENT_COUNT, amount))
+
+
+def _coerce_pinned_comment(item) -> dict:
+    """Normalize one LLM-returned pinned-comment idea into the fixed {key: str}
+    shape, dropping items that are not dicts or carry no comment text."""
+    if not isinstance(item, dict):
+        return {}
+    pinned = {}
+    for key in PINNED_COMMENT_KEYS:
+        value = item.get(key, "")
+        pinned[key] = _clamp_text(value, MAX_PINNED_COMMENT_FIELD_LENGTH)
+    if not pinned["comment"]:
+        return {}
+    return pinned
+
+
+def generate_pinned_comments(
+    video_subject: str,
+    language: str = "",
+    amount: int = DEFAULT_PINNED_COMMENT_COUNT,
+) -> List[dict]:
+    """Write the creator's own first comment to PIN under an affiliate video about
+    ``video_subject`` — the pinned comment is prime real estate for the link / CTA
+    and for sparking the replies that boost reach.
+
+    Returns a list of dicts with the keys in PINNED_COMMENT_KEYS (comment, cta,
+    tip). ``comment`` is the pinned comment text, ``cta`` the short call-to-action
+    line it ends on, and ``tip`` a quick note on why/how to use it. This is the
+    creator's OWN comment to pin, distinct from generate_comment_replies which
+    answers viewers. On repeated failure an empty list is returned so the caller
+    can show a friendly message rather than crash.
+    """
+    amount = _normalize_pinned_comment_count(amount)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "comment", "cta" and "tip" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the subject."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Pinned-Comment Writer
+
+## Goals:
+Write {amount} options for the creator's OWN first comment to pin to the top of a short affiliate video about "{video_subject}". A pinned comment is prime real estate: it points viewers to the link, answers the obvious first question, and invites replies that boost reach.
+
+## Important:
+1. this is the creator's own comment to pin, NOT a reply to a viewer.
+2. each option should hook curiosity or answer the top buying question, then end on a clear call-to-action that points to the link in bio / cart.
+3. keep it short and natural — a couple of lines a real creator would type, light emoji is fine.
+4. give each option a clearly different angle (link drop, question to spark replies, quick benefit, social proof) so the creator can pick.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "comment", "cta", "tip".
+   - "comment": the pinned comment text.
+   - "cta": the short call-to-action line it ends on (e.g. "Link in bio 👆").
+   - "tip": one short note on when/why to use this angle.
+3. {language_line}
+4. do not invent fake prices, fake discounts, fake reviews, or unverifiable claims; keep it honest and non-spammy.
+5. make the {amount} options clearly different from each other.
+
+## Output Example:
+[{{"comment": "...", "cta": "...", "tip": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating pinned comments: subject={video_subject!r}, amount={amount}, "
+        f"language={language!r}"
+    )
+
+    pinned = _generate_json_object_list(
+        prompt, _coerce_pinned_comment, "pinned comments"
+    )
+    return pinned[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(

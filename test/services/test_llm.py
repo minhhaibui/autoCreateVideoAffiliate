@@ -1333,6 +1333,74 @@ class TestPostingSchedule(unittest.TestCase):
             self.assertEqual(llm.generate_posting_schedule(video_subject="x"), [])
 
 
+class TestPinnedComments(unittest.TestCase):
+    """TikTok 带货置顶评论生成。"""
+
+    def test_generate_pinned_comments_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "comment": "Where to buy? 👇",
+                    "cta": "Link in bio 👆",
+                    "tip": "link drop",
+                },
+                {
+                    "comment": "Which size should I get?",
+                    "cta": "Reply below!",
+                    "tip": "sparks replies",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            pinned = llm.generate_pinned_comments(
+                video_subject="mini blender",
+                language="English",
+            )
+
+        self.assertEqual(len(pinned), 2)
+        self.assertEqual(pinned[0]["comment"], "Where to buy? 👇")
+        for item in pinned:
+            self.assertEqual(set(item.keys()), set(llm.PINNED_COMMENT_KEYS))
+
+    def test_generate_pinned_comments_drops_items_without_comment(self):
+        payload = json.dumps(
+            [
+                {"cta": "no comment", "tip": "dropped"},
+                "not a dict",
+                {"comment": "Pin this!", "cta": "Tap bio"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            pinned = llm.generate_pinned_comments(video_subject="x")
+
+        self.assertEqual(len(pinned), 1)
+        self.assertEqual(pinned[0]["comment"], "Pin this!")
+
+    def test_generate_pinned_comments_recovers_embedded_json(self):
+        payload = 'Sure: [{"comment": "Link in bio!"}] enjoy'
+        with patch.object(llm, "_generate_response", return_value=payload):
+            pinned = llm.generate_pinned_comments(video_subject="x")
+
+        self.assertEqual(len(pinned), 1)
+        self.assertEqual(pinned[0]["comment"], "Link in bio!")
+
+    def test_generate_pinned_comments_clamps_amount(self):
+        self.assertEqual(
+            llm._normalize_pinned_comment_count(999), llm.MAX_PINNED_COMMENT_COUNT
+        )
+        self.assertEqual(llm._normalize_pinned_comment_count(0), 1)
+        self.assertEqual(
+            llm._normalize_pinned_comment_count("bad"),
+            llm.DEFAULT_PINNED_COMMENT_COUNT,
+        )
+
+    def test_generate_pinned_comments_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(llm.generate_pinned_comments(video_subject="x"), [])
+
+
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
 FOUNDRY_BASE = "https://amanrai-test-resource.services.ai.azure.com/anthropic"
 FOUNDRY_MODEL = "azure_ai/claude-sonnet-4-6"

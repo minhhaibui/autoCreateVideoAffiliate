@@ -18,6 +18,7 @@ def build_affiliate_package_text(
     stickers=None,
     cover_ideas=None,
     schedule_slots=None,
+    pinned_comments=None,
 ):
     """Assemble all generated affiliate assets into one plain-text document the
     user can download/keep. ``label`` maps section keys to translated headings so
@@ -117,5 +118,16 @@ def build_affiliate_package_text(
                 parts.append(f"   {label('schedule_why')}: {slot['why']}")
             blocks.append("\n".join(parts))
         section(label("schedule"), "\n".join(blocks))
+
+    if pinned_comments:
+        blocks = []
+        for i, pinned in enumerate(pinned_comments):
+            parts = [f"{i + 1}. {pinned.get('comment', '')}".rstrip()]
+            if pinned.get("cta"):
+                parts.append(f"   {label('pinned_cta')}: {pinned['cta']}")
+            if pinned.get("tip"):
+                parts.append(f"   {label('pinned_tip')}: {pinned['tip']}")
+            blocks.append("\n".join(parts))
+        section(label("pinned_comments"), "\n".join(blocks))
 
     return "\n".join(lines).strip() + "\n"

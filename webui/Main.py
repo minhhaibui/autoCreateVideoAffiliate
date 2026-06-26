@@ -1225,6 +1225,55 @@ with left_panel:
             elif "schedule_slots" in st.session_state:
                 st.info(tr("No Posting Schedule"))
 
+        # Pinned first-comment helper. The creator's own pinned comment is prime
+        # real estate for the affiliate link / CTA and for sparking the replies
+        # that boost reach. Distinct from Comment Replies (which answers viewers).
+        with st.container(border=True):
+            st.write(tr("Pinned Comment"))
+            st.caption(tr("Pinned Comment Hint"))
+            pinned_amount = st.slider(
+                tr("Number of Pinned Comments"),
+                min_value=2,
+                max_value=llm.MAX_PINNED_COMMENT_COUNT,
+                value=llm.DEFAULT_PINNED_COMMENT_COUNT,
+                key="pinned_amount",
+            )
+            if st.button(tr("Generate Pinned Comment"), key="auto_generate_pinned"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Pinned Comment")):
+                        st.session_state["pinned_comments"] = llm.generate_pinned_comments(
+                            video_subject=params.video_subject,
+                            language=(
+                                params.video_language
+                                or st.session_state.get("ui_language", "")
+                            ),
+                            amount=pinned_amount,
+                        )
+
+            pinned_comments = st.session_state.get("pinned_comments") or []
+            if pinned_comments:
+                for i, pinned in enumerate(pinned_comments):
+                    with st.expander(
+                        f"📌 {pinned.get('comment', '')}",
+                        expanded=(i == 0),
+                    ):
+                        st.text_area(
+                            tr("Pinned Comment"),
+                            value=pinned.get("comment", ""),
+                            key=f"pinned_comment_{i}",
+                            height=80,
+                            label_visibility="collapsed",
+                        )
+                        if pinned.get("cta"):
+                            st.markdown(f"**{tr('Pinned CTA')}:** {pinned['cta']}")
+                        if pinned.get("tip"):
+                            st.markdown(f"**{tr('Pinned Tip')}:** {pinned['tip']}")
+                st.caption(tr("Pinned Comment Use Hint"))
+            elif "pinned_comments" in st.session_state:
+                st.info(tr("No Pinned Comments"))
+
     with toolkit_tabs[2]:
         # Trending-sound helper. Music choice strongly affects a TikTok's reach, but
         # creators often don't know what to put on. This suggests sound STYLES plus a
@@ -1393,6 +1442,9 @@ with left_panel:
                 "schedule": tr("Posting Schedule"),
                 "schedule_day": tr("Schedule Day"),
                 "schedule_why": tr("Schedule Why"),
+                "pinned_comments": tr("Pinned Comment"),
+                "pinned_cta": tr("Pinned CTA"),
+                "pinned_tip": tr("Pinned Tip"),
             }
             package_text = build_affiliate_package_text(
                 subject=params.video_subject,
@@ -1406,6 +1458,7 @@ with left_panel:
                 stickers=st.session_state.get("text_stickers") or [],
                 cover_ideas=st.session_state.get("cover_ideas") or [],
                 schedule_slots=st.session_state.get("schedule_slots") or [],
+                pinned_comments=st.session_state.get("pinned_comments") or [],
                 label=lambda key: _section_labels.get(key, key),
             )
             has_content = bool(package_text.strip())
