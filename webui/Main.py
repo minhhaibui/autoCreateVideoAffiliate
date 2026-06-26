@@ -973,7 +973,9 @@ with left_panel:
         )
 
     # The affiliate copy helpers are grouped into tabs to keep the left
-    # column readable — only the active tool's panel renders at a time.
+    # column readable. (Streamlit st.tabs still runs every panel's body each
+    # rerun and just hides the inactive ones with CSS — it's a layout aid, not
+    # lazy rendering.)
     toolkit_tabs = st.tabs([
         tr("Toolkit Tab Content"),
         tr("Toolkit Tab Social"),
@@ -1025,9 +1027,15 @@ with left_panel:
                         st.write("")
                         st.write("")
                         if st.button(tr("Use Hook"), key=f"use_hook_{i}"):
-                            existing = (st.session_state.get("video_script") or "").strip()
+                            # Use the user's possibly-edited hook (the keyed input)
+                            # and their live script edits (params.video_script,
+                            # the unkeyed box above) so neither is silently lost.
+                            chosen_hook = (
+                                st.session_state.get(f"video_hook_{i}") or hook
+                            ).strip()
+                            existing = (params.video_script or "").strip()
                             st.session_state["video_script"] = (
-                                f"{hook}\n\n{existing}" if existing else hook
+                                f"{chosen_hook}\n\n{existing}" if existing else chosen_hook
                             )
                             st.rerun()
                 st.caption(tr("Hook Use Hint"))
@@ -1500,11 +1508,19 @@ with left_panel:
                 "disclosure_placement": tr("Disclosure Placement"),
                 "disclosure_note": tr("Disclosure Note"),
             }
+            # Source the script, keywords and hooks from the live widgets the user
+            # actually edits (the unkeyed script/keywords boxes are read back via
+            # params.*; the keyed hook inputs via their session_state keys) so the
+            # export reflects manual edits rather than the stale generated text.
+            edited_hooks = [
+                st.session_state.get(f"video_hook_{i}", h)
+                for i, h in enumerate(st.session_state.get("video_hooks") or [])
+            ]
             package_text = build_affiliate_package_text(
                 subject=params.video_subject,
-                script=st.session_state.get("video_script", ""),
-                keywords=st.session_state.get("video_terms", ""),
-                hooks=st.session_state.get("video_hooks") or [],
+                script=params.video_script or "",
+                keywords=params.video_terms or "",
+                hooks=edited_hooks,
                 social_meta=st.session_state.get("social_metadata"),
                 shots=st.session_state.get("video_shots") or [],
                 comment_replies=st.session_state.get("comment_replies") or [],
