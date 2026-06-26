@@ -972,447 +972,461 @@ with left_panel:
             tr("Video Keywords"), value=st.session_state["video_terms"]
         )
 
-    # Hook generator. The first ~3 seconds decide a TikTok's watch-through rate,
-    # so let the user generate several A/B-testable opening lines for the current
-    # subject and copy the best one into the start of their script.
-    with st.container(border=True):
-        st.write(tr("Hook Ideas"))
-        st.caption(tr("Hook Ideas Hint"))
-        hook_amount = st.slider(
-            tr("Number of Hooks"),
-            min_value=3,
-            max_value=llm.MAX_HOOK_COUNT,
-            value=llm.DEFAULT_HOOK_COUNT,
-            key="hook_amount",
-        )
-        if st.button(tr("Generate Hooks"), key="auto_generate_hooks"):
-            if not params.video_subject:
-                st.error(tr("Please Enter the Video Subject"))
-            else:
-                with st.spinner(tr("Generating Hooks")):
-                    st.session_state["video_hooks"] = llm.generate_hook_variations(
-                        video_subject=params.video_subject,
-                        language=(
-                            params.video_language
-                            or st.session_state.get("ui_language", "")
-                        ),
-                        amount=hook_amount,
-                    )
+    # The affiliate copy helpers are grouped into tabs to keep the left
+    # column readable — only the active tool's panel renders at a time.
+    toolkit_tabs = st.tabs([
+        tr("Toolkit Tab Content"),
+        tr("Toolkit Tab Social"),
+        tr("Toolkit Tab On-screen"),
+        tr("Toolkit Tab Export"),
+    ])
 
-        video_hooks = st.session_state.get("video_hooks") or []
-        if video_hooks:
-            for i, hook in enumerate(video_hooks):
-                hook_cols = st.columns([0.78, 0.22])
-                with hook_cols[0]:
-                    st.text_input(
-                        f"{tr('Hook')} {i + 1}",
-                        value=hook,
-                        key=f"video_hook_{i}",
-                    )
-                with hook_cols[1]:
-                    # Vertical spacer so the button lines up with the input box
-                    # below its label.
-                    st.write("")
-                    st.write("")
-                    if st.button(tr("Use Hook"), key=f"use_hook_{i}"):
-                        existing = (st.session_state.get("video_script") or "").strip()
-                        st.session_state["video_script"] = (
-                            f"{hook}\n\n{existing}" if existing else hook
-                        )
-                        st.rerun()
-            st.caption(tr("Hook Use Hint"))
-        elif "video_hooks" in st.session_state:
-            st.info(tr("No Hooks"))
-
-    # Shot list / storyboard generator. Turns the written script into a
-    # shot-by-shot shooting plan (scene, voiceover line, on-screen text, b-roll
-    # keyword) so the creator knows exactly what to film. Reuses the existing LLM
-    # provider and does not touch the video-generation pipeline.
-    with st.container(border=True):
-        st.write(tr("Shot List"))
-        st.caption(tr("Shot List Hint"))
-        shot_amount = st.slider(
-            tr("Number of Shots"),
-            min_value=3,
-            max_value=llm.MAX_SHOT_COUNT,
-            value=llm.DEFAULT_SHOT_COUNT,
-            key="shot_amount",
-        )
-        if st.button(tr("Generate Shot List"), key="auto_generate_shots"):
-            if not params.video_subject:
-                st.error(tr("Please Enter the Video Subject"))
-            else:
-                with st.spinner(tr("Generating Shot List")):
-                    st.session_state["video_shots"] = llm.generate_shot_list(
-                        video_subject=params.video_subject,
-                        video_script=st.session_state.get("video_script", ""),
-                        language=(
-                            params.video_language
-                            or st.session_state.get("ui_language", "")
-                        ),
-                        amount=shot_amount,
-                    )
-
-        video_shots = st.session_state.get("video_shots") or []
-        if video_shots:
-            for i, shot in enumerate(video_shots):
-                with st.expander(
-                    f"{tr('Shot')} {i + 1} — {shot.get('scene', '')}",
-                    expanded=(i == 0),
-                ):
-                    if shot.get("voiceover"):
-                        st.markdown(
-                            f"**{tr('Shot Voiceover')}:** {shot['voiceover']}"
-                        )
-                    if shot.get("onscreen_text"):
-                        st.markdown(
-                            f"**{tr('Shot On-screen Text')}:** {shot['onscreen_text']}"
-                        )
-                    if shot.get("broll"):
-                        st.markdown(f"**{tr('Shot B-roll')}:** {shot['broll']}")
-            st.caption(tr("Shot List Use Hint"))
-        elif "video_shots" in st.session_state:
-            st.info(tr("No Shots"))
-
-    # TikTok / short-video post caption helper. Reuses the existing
-    # llm.generate_social_metadata backend (already used by the REST API) so the
-    # WebUI user can produce a ready-to-paste title, caption and hashtags for
-    # affiliate posts without leaving the app.
-    with st.container(border=True):
-        st.write(tr("Social Post Caption"))
-        social_platforms = [
-            ("TikTok", "tiktok"),
-            ("YouTube Shorts", "youtube_shorts"),
-            ("Instagram Reels", "instagram_reels"),
-            ("Facebook Reels", "facebook_reels"),
-        ]
-        selected_social_index = st.selectbox(
-            tr("Publish Platform"),
-            index=0,
-            options=range(len(social_platforms)),
-            format_func=lambda x: social_platforms[x][0],
-            key="social_platform_select",
-        )
-        social_platform = social_platforms[selected_social_index][1]
-
-        if st.button(
-            tr("Generate Caption and Hashtags"), key="auto_generate_social"
-        ):
-            current_script = st.session_state.get("video_script", "")
-            if not params.video_subject and not current_script:
-                st.error(tr("Please Enter the Video Subject"))
-            else:
-                with st.spinner(tr("Generating Caption and Hashtags")):
-                    st.session_state["social_metadata"] = llm.generate_social_metadata(
-                        video_subject=params.video_subject,
-                        video_script=current_script,
-                        language=(params.video_language or llm.DEFAULT_SOCIAL_LANGUAGE),
-                        platform=social_platform,
-                    )
-
-        social_meta = st.session_state.get("social_metadata")
-        if social_meta:
-            # No widget keys here on purpose: value= is rebuilt from the latest
-            # generated metadata each rerun, so the fields always show the most
-            # recent result while staying selectable/copyable.
-            st.text_input(tr("Post Title"), value=social_meta.get("title", ""))
-            hashtags = " ".join(social_meta.get("hashtags", []) or [])
-            caption_body = social_meta.get("caption", "")
-            full_caption = (
-                f"{caption_body}\n\n{hashtags}" if hashtags else caption_body
+    with toolkit_tabs[0]:
+        # Hook generator. The first ~3 seconds decide a TikTok's watch-through rate,
+        # so let the user generate several A/B-testable opening lines for the current
+        # subject and copy the best one into the start of their script.
+        with st.container(border=True):
+            st.write(tr("Hook Ideas"))
+            st.caption(tr("Hook Ideas Hint"))
+            hook_amount = st.slider(
+                tr("Number of Hooks"),
+                min_value=3,
+                max_value=llm.MAX_HOOK_COUNT,
+                value=llm.DEFAULT_HOOK_COUNT,
+                key="hook_amount",
             )
-            st.text_area(tr("Caption"), value=full_caption, height=180)
-            st.caption(tr("Caption Copy Hint"))
+            if st.button(tr("Generate Hooks"), key="auto_generate_hooks"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Hooks")):
+                        st.session_state["video_hooks"] = llm.generate_hook_variations(
+                            video_subject=params.video_subject,
+                            language=(
+                                params.video_language
+                                or st.session_state.get("ui_language", "")
+                            ),
+                            amount=hook_amount,
+                        )
 
-    # Comment-reply helper. A lot of affiliate conversion happens in the comments
-    # ("how much?", "where to buy?", "does it work?"). This drafts ready-to-paste
-    # replies for the most likely comments so the creator can answer fast and
-    # point viewers to the link. Reuses the existing LLM provider.
-    with st.container(border=True):
-        st.write(tr("Comment Replies"))
-        st.caption(tr("Comment Replies Hint"))
-        comment_reply_amount = st.slider(
-            tr("Number of Replies"),
-            min_value=3,
-            max_value=llm.MAX_COMMENT_REPLY_COUNT,
-            value=llm.DEFAULT_COMMENT_REPLY_COUNT,
-            key="comment_reply_amount",
-        )
-        if st.button(tr("Generate Comment Replies"), key="auto_generate_comment_replies"):
-            if not params.video_subject:
-                st.error(tr("Please Enter the Video Subject"))
-            else:
-                with st.spinner(tr("Generating Comment Replies")):
-                    st.session_state["comment_replies"] = llm.generate_comment_replies(
-                        video_subject=params.video_subject,
-                        language=(
-                            params.video_language
-                            or st.session_state.get("ui_language", "")
-                        ),
-                        amount=comment_reply_amount,
+            video_hooks = st.session_state.get("video_hooks") or []
+            if video_hooks:
+                for i, hook in enumerate(video_hooks):
+                    hook_cols = st.columns([0.78, 0.22])
+                    with hook_cols[0]:
+                        st.text_input(
+                            f"{tr('Hook')} {i + 1}",
+                            value=hook,
+                            key=f"video_hook_{i}",
+                        )
+                    with hook_cols[1]:
+                        # Vertical spacer so the button lines up with the input box
+                        # below its label.
+                        st.write("")
+                        st.write("")
+                        if st.button(tr("Use Hook"), key=f"use_hook_{i}"):
+                            existing = (st.session_state.get("video_script") or "").strip()
+                            st.session_state["video_script"] = (
+                                f"{hook}\n\n{existing}" if existing else hook
+                            )
+                            st.rerun()
+                st.caption(tr("Hook Use Hint"))
+            elif "video_hooks" in st.session_state:
+                st.info(tr("No Hooks"))
+
+        # Shot list / storyboard generator. Turns the written script into a
+        # shot-by-shot shooting plan (scene, voiceover line, on-screen text, b-roll
+        # keyword) so the creator knows exactly what to film. Reuses the existing LLM
+        # provider and does not touch the video-generation pipeline.
+        with st.container(border=True):
+            st.write(tr("Shot List"))
+            st.caption(tr("Shot List Hint"))
+            shot_amount = st.slider(
+                tr("Number of Shots"),
+                min_value=3,
+                max_value=llm.MAX_SHOT_COUNT,
+                value=llm.DEFAULT_SHOT_COUNT,
+                key="shot_amount",
+            )
+            if st.button(tr("Generate Shot List"), key="auto_generate_shots"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Shot List")):
+                        st.session_state["video_shots"] = llm.generate_shot_list(
+                            video_subject=params.video_subject,
+                            video_script=st.session_state.get("video_script", ""),
+                            language=(
+                                params.video_language
+                                or st.session_state.get("ui_language", "")
+                            ),
+                            amount=shot_amount,
+                        )
+
+            video_shots = st.session_state.get("video_shots") or []
+            if video_shots:
+                for i, shot in enumerate(video_shots):
+                    with st.expander(
+                        f"{tr('Shot')} {i + 1} — {shot.get('scene', '')}",
+                        expanded=(i == 0),
+                    ):
+                        if shot.get("voiceover"):
+                            st.markdown(
+                                f"**{tr('Shot Voiceover')}:** {shot['voiceover']}"
+                            )
+                        if shot.get("onscreen_text"):
+                            st.markdown(
+                                f"**{tr('Shot On-screen Text')}:** {shot['onscreen_text']}"
+                            )
+                        if shot.get("broll"):
+                            st.markdown(f"**{tr('Shot B-roll')}:** {shot['broll']}")
+                st.caption(tr("Shot List Use Hint"))
+            elif "video_shots" in st.session_state:
+                st.info(tr("No Shots"))
+
+    with toolkit_tabs[1]:
+        # TikTok / short-video post caption helper. Reuses the existing
+        # llm.generate_social_metadata backend (already used by the REST API) so the
+        # WebUI user can produce a ready-to-paste title, caption and hashtags for
+        # affiliate posts without leaving the app.
+        with st.container(border=True):
+            st.write(tr("Social Post Caption"))
+            social_platforms = [
+                ("TikTok", "tiktok"),
+                ("YouTube Shorts", "youtube_shorts"),
+                ("Instagram Reels", "instagram_reels"),
+                ("Facebook Reels", "facebook_reels"),
+            ]
+            selected_social_index = st.selectbox(
+                tr("Publish Platform"),
+                index=0,
+                options=range(len(social_platforms)),
+                format_func=lambda x: social_platforms[x][0],
+                key="social_platform_select",
+            )
+            social_platform = social_platforms[selected_social_index][1]
+
+            if st.button(
+                tr("Generate Caption and Hashtags"), key="auto_generate_social"
+            ):
+                current_script = st.session_state.get("video_script", "")
+                if not params.video_subject and not current_script:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Caption and Hashtags")):
+                        st.session_state["social_metadata"] = llm.generate_social_metadata(
+                            video_subject=params.video_subject,
+                            video_script=current_script,
+                            language=(params.video_language or llm.DEFAULT_SOCIAL_LANGUAGE),
+                            platform=social_platform,
+                        )
+
+            social_meta = st.session_state.get("social_metadata")
+            if social_meta:
+                # No widget keys here on purpose: value= is rebuilt from the latest
+                # generated metadata each rerun, so the fields always show the most
+                # recent result while staying selectable/copyable.
+                st.text_input(tr("Post Title"), value=social_meta.get("title", ""))
+                hashtags = " ".join(social_meta.get("hashtags", []) or [])
+                caption_body = social_meta.get("caption", "")
+                full_caption = (
+                    f"{caption_body}\n\n{hashtags}" if hashtags else caption_body
+                )
+                st.text_area(tr("Caption"), value=full_caption, height=180)
+                st.caption(tr("Caption Copy Hint"))
+
+        # Comment-reply helper. A lot of affiliate conversion happens in the comments
+        # ("how much?", "where to buy?", "does it work?"). This drafts ready-to-paste
+        # replies for the most likely comments so the creator can answer fast and
+        # point viewers to the link. Reuses the existing LLM provider.
+        with st.container(border=True):
+            st.write(tr("Comment Replies"))
+            st.caption(tr("Comment Replies Hint"))
+            comment_reply_amount = st.slider(
+                tr("Number of Replies"),
+                min_value=3,
+                max_value=llm.MAX_COMMENT_REPLY_COUNT,
+                value=llm.DEFAULT_COMMENT_REPLY_COUNT,
+                key="comment_reply_amount",
+            )
+            if st.button(tr("Generate Comment Replies"), key="auto_generate_comment_replies"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Comment Replies")):
+                        st.session_state["comment_replies"] = llm.generate_comment_replies(
+                            video_subject=params.video_subject,
+                            language=(
+                                params.video_language
+                                or st.session_state.get("ui_language", "")
+                            ),
+                            amount=comment_reply_amount,
+                        )
+
+            comment_replies = st.session_state.get("comment_replies") or []
+            if comment_replies:
+                for i, pair in enumerate(comment_replies):
+                    with st.expander(
+                        f"💬 {pair.get('comment', '')}",
+                        expanded=(i == 0),
+                    ):
+                        st.text_area(
+                            tr("Suggested Reply"),
+                            value=pair.get("reply", ""),
+                            key=f"comment_reply_{i}",
+                            height=80,
+                        )
+                st.caption(tr("Comment Replies Use Hint"))
+            elif "comment_replies" in st.session_state:
+                st.info(tr("No Comment Replies"))
+
+        with st.container(border=True):
+            st.write(tr("Posting Schedule"))
+            st.caption(tr("Posting Schedule Hint"))
+            schedule_region = st.text_input(
+                tr("Audience Region"),
+                key="schedule_region",
+                placeholder=tr("Audience Region Placeholder"),
+            )
+            schedule_amount = st.slider(
+                tr("Number of Slots"),
+                min_value=2,
+                max_value=llm.MAX_SCHEDULE_COUNT,
+                value=llm.DEFAULT_SCHEDULE_COUNT,
+                key="schedule_amount",
+            )
+            if st.button(tr("Suggest Posting Times"), key="auto_generate_schedule"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Posting Schedule")):
+                        st.session_state["schedule_slots"] = llm.generate_posting_schedule(
+                            video_subject=params.video_subject,
+                            language=(
+                                params.video_language
+                                or st.session_state.get("ui_language", "")
+                            ),
+                            audience_region=schedule_region,
+                            amount=schedule_amount,
+                        )
+
+            schedule_slots = st.session_state.get("schedule_slots") or []
+            if schedule_slots:
+                for i, slot in enumerate(schedule_slots):
+                    header = " — ".join(
+                        p for p in [slot.get("slot", ""), slot.get("time", "")] if p
                     )
+                    with st.expander(f"🕒 {header}", expanded=(i == 0)):
+                        if slot.get("day"):
+                            st.markdown(f"**{tr('Schedule Day')}:** {slot['day']}")
+                        if slot.get("why"):
+                            st.markdown(f"**{tr('Schedule Why')}:** {slot['why']}")
+                st.caption(tr("Posting Schedule Use Hint"))
+            elif "schedule_slots" in st.session_state:
+                st.info(tr("No Posting Schedule"))
 
-        comment_replies = st.session_state.get("comment_replies") or []
-        if comment_replies:
-            for i, pair in enumerate(comment_replies):
-                with st.expander(
-                    f"💬 {pair.get('comment', '')}",
-                    expanded=(i == 0),
-                ):
+    with toolkit_tabs[2]:
+        # Trending-sound helper. Music choice strongly affects a TikTok's reach, but
+        # creators often don't know what to put on. This suggests sound STYLES plus a
+        # keyword to search the in-app sound library (the LLM can't see live charts,
+        # so it's framed as general patterns, not a real-time trending list).
+        with st.container(border=True):
+            st.write(tr("Trending Sounds"))
+            st.caption(tr("Trending Sounds Hint"))
+            sound_amount = st.slider(
+                tr("Number of Sounds"),
+                min_value=3,
+                max_value=llm.MAX_SOUND_COUNT,
+                value=llm.DEFAULT_SOUND_COUNT,
+                key="sound_amount",
+            )
+            if st.button(tr("Suggest Sounds"), key="auto_generate_sounds"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Sounds")):
+                        st.session_state["sound_ideas"] = llm.generate_sound_ideas(
+                            video_subject=params.video_subject,
+                            language=(
+                                params.video_language
+                                or st.session_state.get("ui_language", "")
+                            ),
+                            amount=sound_amount,
+                        )
+
+            sound_ideas = st.session_state.get("sound_ideas") or []
+            if sound_ideas:
+                for i, idea in enumerate(sound_ideas):
+                    with st.expander(
+                        f"🎵 {idea.get('sound', '')}",
+                        expanded=(i == 0),
+                    ):
+                        if idea.get("vibe"):
+                            st.markdown(f"**{tr('Sound Vibe')}:** {idea['vibe']}")
+                        if idea.get("search"):
+                            st.markdown(f"**{tr('Sound Search')}:** {idea['search']}")
+                        if idea.get("tip"):
+                            st.markdown(f"**{tr('Sound Tip')}:** {idea['tip']}")
+                st.caption(tr("Trending Sounds Use Hint"))
+            elif "sound_ideas" in st.session_state:
+                st.info(tr("No Sounds"))
+
+        with st.container(border=True):
+            st.write(tr("Text Stickers"))
+            st.caption(tr("Text Stickers Hint"))
+            sticker_amount = st.slider(
+                tr("Number of Stickers"),
+                min_value=3,
+                max_value=llm.MAX_STICKER_COUNT,
+                value=llm.DEFAULT_STICKER_COUNT,
+                key="sticker_amount",
+            )
+            if st.button(tr("Generate Stickers"), key="auto_generate_stickers"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Stickers")):
+                        st.session_state["text_stickers"] = llm.generate_text_stickers(
+                            video_subject=params.video_subject,
+                            language=(
+                                params.video_language
+                                or st.session_state.get("ui_language", "")
+                            ),
+                            amount=sticker_amount,
+                        )
+
+            text_stickers = st.session_state.get("text_stickers") or []
+            if text_stickers:
+                for i, sticker in enumerate(text_stickers):
+                    with st.expander(
+                        f"💬 {sticker.get('text', '')}",
+                        expanded=(i == 0),
+                    ):
+                        if sticker.get("timing"):
+                            st.markdown(
+                                f"**{tr('Sticker Timing')}:** {sticker['timing']}"
+                            )
+                        if sticker.get("style"):
+                            st.markdown(f"**{tr('Sticker Style')}:** {sticker['style']}")
+                        if sticker.get("purpose"):
+                            st.markdown(
+                                f"**{tr('Sticker Purpose')}:** {sticker['purpose']}"
+                            )
+                st.caption(tr("Text Stickers Use Hint"))
+            elif "text_stickers" in st.session_state:
+                st.info(tr("No Stickers"))
+
+        with st.container(border=True):
+            st.write(tr("Cover Text"))
+            st.caption(tr("Cover Text Hint"))
+            cover_amount = st.slider(
+                tr("Number of Covers"),
+                min_value=2,
+                max_value=llm.MAX_COVER_COUNT,
+                value=llm.DEFAULT_COVER_COUNT,
+                key="cover_amount",
+            )
+            if st.button(tr("Generate Cover Text"), key="auto_generate_covers"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Cover Text")):
+                        st.session_state["cover_ideas"] = llm.generate_cover_text_ideas(
+                            video_subject=params.video_subject,
+                            language=(
+                                params.video_language
+                                or st.session_state.get("ui_language", "")
+                            ),
+                            amount=cover_amount,
+                        )
+
+            cover_ideas = st.session_state.get("cover_ideas") or []
+            if cover_ideas:
+                for i, idea in enumerate(cover_ideas):
+                    with st.expander(
+                        f"🖼️ {idea.get('text', '')}",
+                        expanded=(i == 0),
+                    ):
+                        if idea.get("subtext"):
+                            st.markdown(f"**{tr('Cover Subtext')}:** {idea['subtext']}")
+                        if idea.get("angle"):
+                            st.markdown(f"**{tr('Cover Angle')}:** {idea['angle']}")
+                        if idea.get("tip"):
+                            st.markdown(f"**{tr('Cover Tip')}:** {idea['tip']}")
+                st.caption(tr("Cover Text Use Hint"))
+            elif "cover_ideas" in st.session_state:
+                st.info(tr("No Cover Text"))
+
+    with toolkit_tabs[3]:
+        # Export helper: bundle every generated asset (subject, hooks, script,
+        # keywords, caption, hashtags) into one text file so creators can archive
+        # their copy or move it into a publishing tool in a single click.
+        with st.container(border=True):
+            st.write(tr("Export Copy"))
+            st.caption(tr("Export Copy Hint"))
+            _section_labels = {
+                "subject": tr("Video Subject"),
+                "hooks": tr("Hook Ideas"),
+                "script": tr("Video Script"),
+                "shots": tr("Shot List"),
+                "shot_voiceover": tr("Shot Voiceover"),
+                "shot_onscreen": tr("Shot On-screen Text"),
+                "shot_broll": tr("Shot B-roll"),
+                "keywords": tr("Video Keywords"),
+                "title": tr("Post Title"),
+                "caption": tr("Caption"),
+                "hashtags": tr("Hashtags"),
+                "comment_replies": tr("Comment Replies"),
+                "reply": tr("Suggested Reply"),
+                "sounds": tr("Trending Sounds"),
+                "sound_vibe": tr("Sound Vibe"),
+                "sound_search": tr("Sound Search"),
+                "sound_tip": tr("Sound Tip"),
+                "stickers": tr("Text Stickers"),
+                "sticker_timing": tr("Sticker Timing"),
+                "sticker_style": tr("Sticker Style"),
+                "sticker_purpose": tr("Sticker Purpose"),
+                "covers": tr("Cover Text"),
+                "cover_subtext": tr("Cover Subtext"),
+                "cover_angle": tr("Cover Angle"),
+                "cover_tip": tr("Cover Tip"),
+                "schedule": tr("Posting Schedule"),
+                "schedule_day": tr("Schedule Day"),
+                "schedule_why": tr("Schedule Why"),
+            }
+            package_text = build_affiliate_package_text(
+                subject=params.video_subject,
+                script=st.session_state.get("video_script", ""),
+                keywords=st.session_state.get("video_terms", ""),
+                hooks=st.session_state.get("video_hooks") or [],
+                social_meta=st.session_state.get("social_metadata"),
+                shots=st.session_state.get("video_shots") or [],
+                comment_replies=st.session_state.get("comment_replies") or [],
+                sound_ideas=st.session_state.get("sound_ideas") or [],
+                stickers=st.session_state.get("text_stickers") or [],
+                cover_ideas=st.session_state.get("cover_ideas") or [],
+                schedule_slots=st.session_state.get("schedule_slots") or [],
+                label=lambda key: _section_labels.get(key, key),
+            )
+            has_content = bool(package_text.strip())
+            if has_content:
+                st.download_button(
+                    tr("Download Copy"),
+                    data=package_text.encode("utf-8"),
+                    file_name="affiliate_copy.txt",
+                    mime="text/plain",
+                    key="download_affiliate_copy",
+                )
+                with st.expander(tr("Preview Copy"), expanded=False):
                     st.text_area(
-                        tr("Suggested Reply"),
-                        value=pair.get("reply", ""),
-                        key=f"comment_reply_{i}",
-                        height=80,
+                        tr("Export Copy"),
+                        value=package_text,
+                        height=240,
+                        label_visibility="collapsed",
                     )
-            st.caption(tr("Comment Replies Use Hint"))
-        elif "comment_replies" in st.session_state:
-            st.info(tr("No Comment Replies"))
-
-    # Trending-sound helper. Music choice strongly affects a TikTok's reach, but
-    # creators often don't know what to put on. This suggests sound STYLES plus a
-    # keyword to search the in-app sound library (the LLM can't see live charts,
-    # so it's framed as general patterns, not a real-time trending list).
-    with st.container(border=True):
-        st.write(tr("Trending Sounds"))
-        st.caption(tr("Trending Sounds Hint"))
-        sound_amount = st.slider(
-            tr("Number of Sounds"),
-            min_value=3,
-            max_value=llm.MAX_SOUND_COUNT,
-            value=llm.DEFAULT_SOUND_COUNT,
-            key="sound_amount",
-        )
-        if st.button(tr("Suggest Sounds"), key="auto_generate_sounds"):
-            if not params.video_subject:
-                st.error(tr("Please Enter the Video Subject"))
             else:
-                with st.spinner(tr("Generating Sounds")):
-                    st.session_state["sound_ideas"] = llm.generate_sound_ideas(
-                        video_subject=params.video_subject,
-                        language=(
-                            params.video_language
-                            or st.session_state.get("ui_language", "")
-                        ),
-                        amount=sound_amount,
-                    )
+                st.info(tr("Nothing to Export"))
 
-        sound_ideas = st.session_state.get("sound_ideas") or []
-        if sound_ideas:
-            for i, idea in enumerate(sound_ideas):
-                with st.expander(
-                    f"🎵 {idea.get('sound', '')}",
-                    expanded=(i == 0),
-                ):
-                    if idea.get("vibe"):
-                        st.markdown(f"**{tr('Sound Vibe')}:** {idea['vibe']}")
-                    if idea.get("search"):
-                        st.markdown(f"**{tr('Sound Search')}:** {idea['search']}")
-                    if idea.get("tip"):
-                        st.markdown(f"**{tr('Sound Tip')}:** {idea['tip']}")
-            st.caption(tr("Trending Sounds Use Hint"))
-        elif "sound_ideas" in st.session_state:
-            st.info(tr("No Sounds"))
-
-    with st.container(border=True):
-        st.write(tr("Text Stickers"))
-        st.caption(tr("Text Stickers Hint"))
-        sticker_amount = st.slider(
-            tr("Number of Stickers"),
-            min_value=3,
-            max_value=llm.MAX_STICKER_COUNT,
-            value=llm.DEFAULT_STICKER_COUNT,
-            key="sticker_amount",
-        )
-        if st.button(tr("Generate Stickers"), key="auto_generate_stickers"):
-            if not params.video_subject:
-                st.error(tr("Please Enter the Video Subject"))
-            else:
-                with st.spinner(tr("Generating Stickers")):
-                    st.session_state["text_stickers"] = llm.generate_text_stickers(
-                        video_subject=params.video_subject,
-                        language=(
-                            params.video_language
-                            or st.session_state.get("ui_language", "")
-                        ),
-                        amount=sticker_amount,
-                    )
-
-        text_stickers = st.session_state.get("text_stickers") or []
-        if text_stickers:
-            for i, sticker in enumerate(text_stickers):
-                with st.expander(
-                    f"💬 {sticker.get('text', '')}",
-                    expanded=(i == 0),
-                ):
-                    if sticker.get("timing"):
-                        st.markdown(
-                            f"**{tr('Sticker Timing')}:** {sticker['timing']}"
-                        )
-                    if sticker.get("style"):
-                        st.markdown(f"**{tr('Sticker Style')}:** {sticker['style']}")
-                    if sticker.get("purpose"):
-                        st.markdown(
-                            f"**{tr('Sticker Purpose')}:** {sticker['purpose']}"
-                        )
-            st.caption(tr("Text Stickers Use Hint"))
-        elif "text_stickers" in st.session_state:
-            st.info(tr("No Stickers"))
-
-    with st.container(border=True):
-        st.write(tr("Cover Text"))
-        st.caption(tr("Cover Text Hint"))
-        cover_amount = st.slider(
-            tr("Number of Covers"),
-            min_value=2,
-            max_value=llm.MAX_COVER_COUNT,
-            value=llm.DEFAULT_COVER_COUNT,
-            key="cover_amount",
-        )
-        if st.button(tr("Generate Cover Text"), key="auto_generate_covers"):
-            if not params.video_subject:
-                st.error(tr("Please Enter the Video Subject"))
-            else:
-                with st.spinner(tr("Generating Cover Text")):
-                    st.session_state["cover_ideas"] = llm.generate_cover_text_ideas(
-                        video_subject=params.video_subject,
-                        language=(
-                            params.video_language
-                            or st.session_state.get("ui_language", "")
-                        ),
-                        amount=cover_amount,
-                    )
-
-        cover_ideas = st.session_state.get("cover_ideas") or []
-        if cover_ideas:
-            for i, idea in enumerate(cover_ideas):
-                with st.expander(
-                    f"🖼️ {idea.get('text', '')}",
-                    expanded=(i == 0),
-                ):
-                    if idea.get("subtext"):
-                        st.markdown(f"**{tr('Cover Subtext')}:** {idea['subtext']}")
-                    if idea.get("angle"):
-                        st.markdown(f"**{tr('Cover Angle')}:** {idea['angle']}")
-                    if idea.get("tip"):
-                        st.markdown(f"**{tr('Cover Tip')}:** {idea['tip']}")
-            st.caption(tr("Cover Text Use Hint"))
-        elif "cover_ideas" in st.session_state:
-            st.info(tr("No Cover Text"))
-
-    with st.container(border=True):
-        st.write(tr("Posting Schedule"))
-        st.caption(tr("Posting Schedule Hint"))
-        schedule_region = st.text_input(
-            tr("Audience Region"),
-            key="schedule_region",
-            placeholder=tr("Audience Region Placeholder"),
-        )
-        schedule_amount = st.slider(
-            tr("Number of Slots"),
-            min_value=2,
-            max_value=llm.MAX_SCHEDULE_COUNT,
-            value=llm.DEFAULT_SCHEDULE_COUNT,
-            key="schedule_amount",
-        )
-        if st.button(tr("Suggest Posting Times"), key="auto_generate_schedule"):
-            if not params.video_subject:
-                st.error(tr("Please Enter the Video Subject"))
-            else:
-                with st.spinner(tr("Generating Posting Schedule")):
-                    st.session_state["schedule_slots"] = llm.generate_posting_schedule(
-                        video_subject=params.video_subject,
-                        language=(
-                            params.video_language
-                            or st.session_state.get("ui_language", "")
-                        ),
-                        audience_region=schedule_region,
-                        amount=schedule_amount,
-                    )
-
-        schedule_slots = st.session_state.get("schedule_slots") or []
-        if schedule_slots:
-            for i, slot in enumerate(schedule_slots):
-                header = " — ".join(
-                    p for p in [slot.get("slot", ""), slot.get("time", "")] if p
-                )
-                with st.expander(f"🕒 {header}", expanded=(i == 0)):
-                    if slot.get("day"):
-                        st.markdown(f"**{tr('Schedule Day')}:** {slot['day']}")
-                    if slot.get("why"):
-                        st.markdown(f"**{tr('Schedule Why')}:** {slot['why']}")
-            st.caption(tr("Posting Schedule Use Hint"))
-        elif "schedule_slots" in st.session_state:
-            st.info(tr("No Posting Schedule"))
-
-    # Export helper: bundle every generated asset (subject, hooks, script,
-    # keywords, caption, hashtags) into one text file so creators can archive
-    # their copy or move it into a publishing tool in a single click.
-    with st.container(border=True):
-        st.write(tr("Export Copy"))
-        st.caption(tr("Export Copy Hint"))
-        _section_labels = {
-            "subject": tr("Video Subject"),
-            "hooks": tr("Hook Ideas"),
-            "script": tr("Video Script"),
-            "shots": tr("Shot List"),
-            "shot_voiceover": tr("Shot Voiceover"),
-            "shot_onscreen": tr("Shot On-screen Text"),
-            "shot_broll": tr("Shot B-roll"),
-            "keywords": tr("Video Keywords"),
-            "title": tr("Post Title"),
-            "caption": tr("Caption"),
-            "hashtags": tr("Hashtags"),
-            "comment_replies": tr("Comment Replies"),
-            "reply": tr("Suggested Reply"),
-            "sounds": tr("Trending Sounds"),
-            "sound_vibe": tr("Sound Vibe"),
-            "sound_search": tr("Sound Search"),
-            "sound_tip": tr("Sound Tip"),
-            "stickers": tr("Text Stickers"),
-            "sticker_timing": tr("Sticker Timing"),
-            "sticker_style": tr("Sticker Style"),
-            "sticker_purpose": tr("Sticker Purpose"),
-            "covers": tr("Cover Text"),
-            "cover_subtext": tr("Cover Subtext"),
-            "cover_angle": tr("Cover Angle"),
-            "cover_tip": tr("Cover Tip"),
-            "schedule": tr("Posting Schedule"),
-            "schedule_day": tr("Schedule Day"),
-            "schedule_why": tr("Schedule Why"),
-        }
-        package_text = build_affiliate_package_text(
-            subject=params.video_subject,
-            script=st.session_state.get("video_script", ""),
-            keywords=st.session_state.get("video_terms", ""),
-            hooks=st.session_state.get("video_hooks") or [],
-            social_meta=st.session_state.get("social_metadata"),
-            shots=st.session_state.get("video_shots") or [],
-            comment_replies=st.session_state.get("comment_replies") or [],
-            sound_ideas=st.session_state.get("sound_ideas") or [],
-            stickers=st.session_state.get("text_stickers") or [],
-            cover_ideas=st.session_state.get("cover_ideas") or [],
-            schedule_slots=st.session_state.get("schedule_slots") or [],
-            label=lambda key: _section_labels.get(key, key),
-        )
-        has_content = bool(package_text.strip())
-        if has_content:
-            st.download_button(
-                tr("Download Copy"),
-                data=package_text.encode("utf-8"),
-                file_name="affiliate_copy.txt",
-                mime="text/plain",
-                key="download_affiliate_copy",
-            )
-            with st.expander(tr("Preview Copy"), expanded=False):
-                st.text_area(
-                    tr("Export Copy"),
-                    value=package_text,
-                    height=240,
-                    label_visibility="collapsed",
-                )
-        else:
-            st.info(tr("Nothing to Export"))
 
 with middle_panel:
     with st.container(border=True):
