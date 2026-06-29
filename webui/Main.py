@@ -30,6 +30,7 @@ from app.services.affiliate import build_affiliate_package_text, format_schedule
 from app.services.campaign import (
     CAMPAIGN_FIELDS,
     format_campaign_cta,
+    format_onscreen_cta,
     has_campaign,
 )
 from app.services.fonts import get_recommended_font
@@ -346,7 +347,17 @@ def _campaign_label(key):
         "campaign_code_label": tr("Campaign Code"),
         "campaign_link_label": tr("Campaign Link"),
         "campaign_shop_label": tr("Campaign Shop"),
+        "campaign_onscreen_pointer": tr("CTA Pointer Text"),
     }.get(key, key)
+
+
+def _fill_onscreen_cta():
+    """on_click callback: (re)derive the burned-CTA text from the current campaign
+    fields. Done in a callback so we may write the widget's session_state key
+    without the post-instantiation exception Streamlit raises otherwise."""
+    st.session_state["onscreen_cta_text"] = format_onscreen_cta(
+        _campaign_values(), _campaign_label
+    )
 
 
 def render_detail_fields(item, fields):
@@ -897,6 +908,35 @@ with left_panel:
             st.caption(tr("Campaign CTA Preview"))
             st.code(cta, language=None)
             st.caption(tr("Campaign CTA Hint"))
+
+        # Burn a plain-text CTA onto the rendered video (no emoji — fonts lack
+        # the glyphs). Editable; defaults derived from the campaign on demand.
+        burn_cta = st.checkbox(tr("Burn CTA Onto Video"), key="cta_enabled")
+        if burn_cta:
+            st.caption(tr("Burn CTA Hint"))
+            if "onscreen_cta_text" not in st.session_state:
+                st.session_state["onscreen_cta_text"] = format_onscreen_cta(
+                    campaign, _campaign_label
+                )
+            st.text_area(tr("On-screen CTA Text"), key="onscreen_cta_text", height=70)
+            st.button(
+                tr("Fill CTA From Campaign"),
+                on_click=_fill_onscreen_cta,
+                key="fill_onscreen_cta",
+            )
+            cta_positions = [
+                (tr("CTA Position Top"), "top"),
+                (tr("CTA Position Center"), "center"),
+                (tr("CTA Position Bottom"), "bottom"),
+            ]
+            pos_idx = st.selectbox(
+                tr("CTA Position"),
+                range(len(cta_positions)),
+                format_func=lambda i: cta_positions[i][0],
+                key="cta_position_idx",
+            )
+            params.cta_text = st.session_state.get("onscreen_cta_text", "")
+            params.cta_position = cta_positions[pos_idx][1]
 
     with st.container(border=True):
         st.write(tr("Video Script Settings"))

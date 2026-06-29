@@ -3,6 +3,7 @@ import unittest
 from app.services.campaign import (
     build_campaign_section,
     format_campaign_cta,
+    format_onscreen_cta,
     has_campaign,
     normalize_campaign,
 )
@@ -71,6 +72,28 @@ class TestFormatCampaignCta(unittest.TestCase):
 
     def test_price_only_still_shows_cart_line(self):
         self.assertIn("🛒 199k", format_campaign_cta({"price": "199k"}, _label))
+
+
+class TestFormatOnscreenCta(unittest.TestCase):
+    def test_empty_returns_blank(self):
+        self.assertEqual(format_onscreen_cta(None, _label), "")
+        self.assertEqual(format_onscreen_cta({}, _label), "")
+
+    def test_has_no_emoji(self):
+        cta = format_onscreen_cta(FULL, _label)
+        self.assertTrue(cta.isascii() or all(ord(c) < 0x1F000 for c in cta))
+        # explicit: none of the emoji used by the pasteable CTA leak in
+        for emoji in ("🛒", "🎁", "👉", "🏪", "👇"):
+            self.assertNotIn(emoji, cta)
+
+    def test_includes_code_verbatim_and_pointer(self):
+        cta = format_onscreen_cta(FULL, _label)
+        self.assertIn("SALE10", cta)
+        self.assertIn("campaign_onscreen_pointer", cta)
+
+    def test_pointer_only_when_no_code(self):
+        cta = format_onscreen_cta({"product": "Blender"}, _label)
+        self.assertEqual(cta, "campaign_onscreen_pointer")
 
 
 class TestBuildCampaignSection(unittest.TestCase):

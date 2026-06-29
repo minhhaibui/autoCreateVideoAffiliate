@@ -54,6 +54,22 @@ def format_campaign_cta(campaign, label) -> str:
     return "\n".join(lines)
 
 
+def format_onscreen_cta(campaign, label) -> str:
+    """A short, PLAIN-TEXT CTA to burn onto the video — no emoji, because the
+    bundled subtitle fonts have no emoji glyphs and would render boxes. Shows the
+    discount code (verbatim) when present, plus a pointer to the pinned-comment
+    link. Returns '' when the campaign is empty. Used only as the editable
+    default; the user controls the exact burned text."""
+    data = normalize_campaign(campaign)
+    if not has_campaign(data):
+        return ""
+    lines = []
+    if data["code"]:
+        lines.append(f"{label('campaign_code_label')}: {data['code']}")
+    lines.append(label("campaign_onscreen_pointer"))
+    return "\n".join(lines)
+
+
 def build_campaign_section(campaign, label) -> str:
     """A plain-text details block for the export bundle: every present field on
     its own labelled line. Returns '' when the campaign is empty."""

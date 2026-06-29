@@ -105,6 +105,12 @@ class VideoParams(BaseModel):
     font_size: int = 60
     stroke_color: Optional[str] = "#000000"
     stroke_width: float = 1.5
+
+    # On-screen affiliate CTA burned into the whole video (plain text only — the
+    # bundled fonts have no emoji glyphs). Empty = off. See app.services.campaign.
+    cta_text: str = Field(default="", max_length=120)
+    cta_position: Optional[str] = "top"  # top, bottom, center
+
     n_threads: Optional[int] = 2
     paragraph_number: int = Field(default=1, ge=1, le=10)
     video_script_prompt: str = Field(default="", max_length=2000)

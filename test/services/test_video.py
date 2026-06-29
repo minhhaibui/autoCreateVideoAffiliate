@@ -379,6 +379,38 @@ class TestVideoService(unittest.TestCase):
         finally:
             vd.close_clip(clip)
 
+    def test_create_cta_clip_renders_positioned_full_duration_overlay(self):
+        """The affiliate CTA overlay must build a real, renderable clip that spans
+        the whole video and sits near the top by default (away from subtitles)."""
+        fonts = [
+            f
+            for f in os.listdir(utils.font_dir())
+            if f.lower().endswith((".ttf", ".ttc", ".otf"))
+        ]
+        if not fonts:
+            self.skipTest("no bundled font available")
+        font_path = os.path.join(utils.font_dir(), fonts[0])
+
+        clip = vd._create_cta_clip(
+            text="Discount code: SALE10\nLink in pinned comment",
+            video_width=1080,
+            video_height=1920,
+            font_path=font_path,
+            font_size=42,
+            position="top",
+            duration=5.0,
+        )
+        try:
+            self.assertEqual(clip.duration, 5.0)
+            # renders an actual RGB frame without raising
+            frame = clip.get_frame(1.0)
+            self.assertEqual(frame.shape[2], 3)
+            # top position → y in the upper region of a 1920-tall frame
+            _, y = clip.pos(0)
+            self.assertLess(y, 1920 * 0.5)
+        finally:
+            vd.close_clip(clip)
+
     def test_combine_videos_closes_audio_clip_when_duration_read_fails(self):
         """
         `combine_videos()` 只需要读取旁白音频时长。即使读取 duration

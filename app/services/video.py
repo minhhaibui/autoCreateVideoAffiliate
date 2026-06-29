@@ -793,6 +793,73 @@ def _rounded_subtitle_background_clip(
     return ImageClip(np.array(img), transparent=True)
 
 
+def _create_cta_clip(
+    text: str,
+    video_width: int,
+    video_height: int,
+    font_path: str,
+    font_size: int,
+    position: str,
+    duration: float,
+):
+    """Build a persistent affiliate CTA overlay (white text on a rounded,
+    semi-transparent band) that spans the whole video. Plain text only — the
+    bundled fonts have no emoji glyphs. Positioned away from the subtitles
+    (defaults to the top, since subtitles default to the bottom)."""
+    max_width = int(video_width * 0.9)
+    wrapped_txt, txt_height = wrap_text(
+        text, max_width=max_width, font=font_path, fontsize=font_size
+    )
+    interline = int(font_size * 0.25)
+    line_count = wrapped_txt.count("\n") + 1
+    vertical_padding = int(font_size * 0.35)
+    clip_h = int(txt_height + vertical_padding + (interline * line_count))
+
+    try:
+        font = ImageFont.truetype(font_path, font_size)
+        text_w = max(
+            int(font.getbbox(line)[2] - font.getbbox(line)[0])
+            for line in wrapped_txt.split("\n")
+        )
+    except Exception as exc:
+        logger.warning(
+            f"failed to measure CTA text width, fallback to max width: {str(exc)}"
+        )
+        text_w = max_width
+
+    pad_x = int(font_size * 0.6)
+    box_w = max(1, min(max_width, text_w + 2 * pad_x))
+    radius = max(8, int(font_size * 0.4))
+
+    text_clip = TextClip(
+        text=wrapped_txt,
+        font=font_path,
+        font_size=font_size,
+        color="#FFFFFF",
+        bg_color=None,
+        stroke_color="#000000",
+        stroke_width=max(1, int(font_size * 0.04)),
+        interline=interline,
+        size=(box_w, clip_h),
+        text_align="center",
+    )
+    bg_clip = _rounded_subtitle_background_clip(
+        width=box_w, height=clip_h, color="#000000", alpha=160, radius=radius
+    )
+    cta_clip = CompositeVideoClip(
+        [bg_clip, text_clip.with_position("center")], size=(box_w, clip_h)
+    )
+    cta_clip = cta_clip.with_start(0).with_duration(duration)
+
+    if position == "bottom":
+        y = video_height * 0.85 - cta_clip.h
+    elif position == "center":
+        y = (video_height - cta_clip.h) / 2
+    else:  # top
+        y = video_height * 0.08
+    return cta_clip.with_position(("center", y))
+
+
 def generate_video(
     video_path: str,
     audio_path: str,
@@ -954,6 +1021,30 @@ def generate_video(
             clip = create_text_clip(subtitle_item=item)
             text_clips.append(clip)
         video_clip = CompositeVideoClip([video_clip, *text_clips])
+
+    # Burn a persistent affiliate CTA over the whole video. Wrapped so a CTA
+    # failure can never abort an otherwise-good render.
+    cta_text = (getattr(params, "cta_text", "") or "").strip()
+    if cta_text:
+        try:
+            cta_font = font_path or os.path.join(
+                utils.font_dir(), params.font_name or "STHeitiMedium.ttc"
+            )
+            if os.name == "nt":
+                cta_font = cta_font.replace("\\", "/")
+            cta_clip = _create_cta_clip(
+                text=cta_text,
+                video_width=video_width,
+                video_height=video_height,
+                font_path=cta_font,
+                font_size=max(20, int(int(params.font_size) * 0.7)),
+                position=getattr(params, "cta_position", "top") or "top",
+                duration=video_clip.duration,
+            )
+            video_clip = CompositeVideoClip([video_clip, cta_clip])
+            logger.info(f"  ⑥ on-screen CTA: {cta_text!r}")
+        except Exception as e:
+            logger.error(f"failed to add on-screen CTA: {str(e)}")
 
     bgm_file = get_bgm_file(bgm_type=params.bgm_type, bgm_file=params.bgm_file)
     if bgm_file:
