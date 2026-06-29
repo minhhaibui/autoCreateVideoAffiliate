@@ -26,7 +26,7 @@ from app.models.schema import (
 )
 from app.services import llm, voice
 from app.services import task as tm
-from app.services.affiliate import build_affiliate_package_text
+from app.services.affiliate import build_affiliate_package_text, format_schedule_header
 from app.services.fonts import get_recommended_font
 from app.utils import utils
 
@@ -1221,9 +1221,7 @@ with left_panel:
             schedule_slots = st.session_state.get("schedule_slots") or []
             if schedule_slots:
                 for i, slot in enumerate(schedule_slots):
-                    header = " — ".join(
-                        p for p in [slot.get("slot", ""), slot.get("time", "")] if p
-                    )
+                    header = format_schedule_header(slot)
                     with st.expander(f"🕒 {header}", expanded=(i == 0)):
                         if slot.get("day"):
                             st.markdown(f"**{tr('Schedule Day')}:** {slot['day']}")

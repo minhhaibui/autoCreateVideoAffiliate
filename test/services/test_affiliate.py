@@ -1,6 +1,9 @@
 import unittest
 
-from app.services.affiliate import build_affiliate_package_text
+from app.services.affiliate import (
+    build_affiliate_package_text,
+    format_schedule_header,
+)
 
 
 def _build(**kwargs):
@@ -158,6 +161,17 @@ class TestBuildAffiliatePackageText(unittest.TestCase):
             label=lambda key: {"subject": "Chủ đề"}.get(key, key),
         )
         self.assertIn("## Chủ đề\nX", out)
+
+
+class TestFormatScheduleHeader(unittest.TestCase):
+    def test_joins_slot_and_time(self):
+        header = format_schedule_header({"slot": "Prime evening", "time": "7-9 PM"})
+        self.assertEqual(header, "Prime evening — 7-9 PM")
+
+    def test_skips_missing_parts(self):
+        self.assertEqual(format_schedule_header({"time": "7-9 PM"}), "7-9 PM")
+        self.assertEqual(format_schedule_header({"slot": "Prime evening"}), "Prime evening")
+        self.assertEqual(format_schedule_header({}), "")
 
 
 if __name__ == "__main__":

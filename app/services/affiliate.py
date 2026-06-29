@@ -5,6 +5,13 @@ Streamlit (importing Main.py executes Streamlit page setup at module load).
 """
 
 
+def format_schedule_header(slot) -> str:
+    """One-line header for a posting-schedule slot, joining its time-window label
+    and clock time with an em dash and skipping whichever part is missing. Shared
+    by the export bundle and the WebUI expander so both read identically."""
+    return " — ".join(p for p in [slot.get("slot", ""), slot.get("time", "")] if p)
+
+
 def build_affiliate_package_text(
     subject,
     script,
@@ -109,9 +116,7 @@ def build_affiliate_package_text(
     if schedule_slots:
         blocks = []
         for i, slot in enumerate(schedule_slots):
-            head = " — ".join(
-                p for p in [slot.get("slot", ""), slot.get("time", "")] if p
-            )
+            head = format_schedule_header(slot)
             parts = [f"{i + 1}. {head}".rstrip()]
             if slot.get("day"):
                 parts.append(f"   {label('schedule_day')}: {slot['day']}")
