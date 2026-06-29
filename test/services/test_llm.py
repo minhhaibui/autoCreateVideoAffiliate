@@ -892,9 +892,9 @@ class TestShotList(unittest.TestCase):
         self.assertEqual(shots[0]["scene"], "Shot one")
 
     def test_generate_shot_list_clamps_amount(self):
-        self.assertEqual(llm._normalize_shot_count(999), llm.MAX_SHOT_COUNT)
-        self.assertEqual(llm._normalize_shot_count(0), 1)
-        self.assertEqual(llm._normalize_shot_count("bad"), llm.DEFAULT_SHOT_COUNT)
+        self.assertEqual(llm._clamp_count(999, llm.DEFAULT_SHOT_COUNT, llm.MAX_SHOT_COUNT), llm.MAX_SHOT_COUNT)
+        self.assertEqual(llm._clamp_count(0, llm.DEFAULT_SHOT_COUNT, llm.MAX_SHOT_COUNT), 1)
+        self.assertEqual(llm._clamp_count("bad", llm.DEFAULT_SHOT_COUNT, llm.MAX_SHOT_COUNT), llm.DEFAULT_SHOT_COUNT)
 
     def test_generate_shot_list_returns_empty_on_error(self):
         with patch.object(
@@ -945,11 +945,11 @@ class TestCommentReplies(unittest.TestCase):
 
     def test_generate_comment_replies_clamps_amount(self):
         self.assertEqual(
-            llm._normalize_comment_reply_count(999), llm.MAX_COMMENT_REPLY_COUNT
+            llm._clamp_count(999, llm.DEFAULT_COMMENT_REPLY_COUNT, llm.MAX_COMMENT_REPLY_COUNT), llm.MAX_COMMENT_REPLY_COUNT
         )
-        self.assertEqual(llm._normalize_comment_reply_count(0), 1)
+        self.assertEqual(llm._clamp_count(0, llm.DEFAULT_COMMENT_REPLY_COUNT, llm.MAX_COMMENT_REPLY_COUNT), 1)
         self.assertEqual(
-            llm._normalize_comment_reply_count("bad"),
+            llm._clamp_count("bad", llm.DEFAULT_COMMENT_REPLY_COUNT, llm.MAX_COMMENT_REPLY_COUNT),
             llm.DEFAULT_COMMENT_REPLY_COUNT,
         )
 
@@ -1010,11 +1010,11 @@ class TestProductIdeas(unittest.TestCase):
 
     def test_generate_product_ideas_clamps_amount(self):
         self.assertEqual(
-            llm._normalize_product_idea_count(999), llm.MAX_PRODUCT_IDEA_COUNT
+            llm._clamp_count(999, llm.DEFAULT_PRODUCT_IDEA_COUNT, llm.MAX_PRODUCT_IDEA_COUNT), llm.MAX_PRODUCT_IDEA_COUNT
         )
-        self.assertEqual(llm._normalize_product_idea_count(0), 1)
+        self.assertEqual(llm._clamp_count(0, llm.DEFAULT_PRODUCT_IDEA_COUNT, llm.MAX_PRODUCT_IDEA_COUNT), 1)
         self.assertEqual(
-            llm._normalize_product_idea_count("bad"),
+            llm._clamp_count("bad", llm.DEFAULT_PRODUCT_IDEA_COUNT, llm.MAX_PRODUCT_IDEA_COUNT),
             llm.DEFAULT_PRODUCT_IDEA_COUNT,
         )
 
@@ -1060,9 +1060,9 @@ class TestHookVariations(unittest.TestCase):
         self.assertEqual(hooks, ["Stop scrolling now", "A second hook"])
 
     def test_generate_hook_variations_clamps_amount(self):
-        self.assertEqual(llm._normalize_hook_count(999), llm.MAX_HOOK_COUNT)
-        self.assertEqual(llm._normalize_hook_count(0), 1)
-        self.assertEqual(llm._normalize_hook_count("bad"), llm.DEFAULT_HOOK_COUNT)
+        self.assertEqual(llm._clamp_count(999, llm.DEFAULT_HOOK_COUNT, llm.MAX_HOOK_COUNT), llm.MAX_HOOK_COUNT)
+        self.assertEqual(llm._clamp_count(0, llm.DEFAULT_HOOK_COUNT, llm.MAX_HOOK_COUNT), 1)
+        self.assertEqual(llm._clamp_count("bad", llm.DEFAULT_HOOK_COUNT, llm.MAX_HOOK_COUNT), llm.DEFAULT_HOOK_COUNT)
 
     def test_generate_hook_variations_returns_empty_on_error(self):
         with patch.object(
@@ -1124,9 +1124,9 @@ class TestSoundIdeas(unittest.TestCase):
         self.assertEqual(ideas[0]["sound"], "suspense build-up")
 
     def test_generate_sound_ideas_clamps_amount(self):
-        self.assertEqual(llm._normalize_sound_count(999), llm.MAX_SOUND_COUNT)
-        self.assertEqual(llm._normalize_sound_count(0), 1)
-        self.assertEqual(llm._normalize_sound_count("bad"), llm.DEFAULT_SOUND_COUNT)
+        self.assertEqual(llm._clamp_count(999, llm.DEFAULT_SOUND_COUNT, llm.MAX_SOUND_COUNT), llm.MAX_SOUND_COUNT)
+        self.assertEqual(llm._clamp_count(0, llm.DEFAULT_SOUND_COUNT, llm.MAX_SOUND_COUNT), 1)
+        self.assertEqual(llm._clamp_count("bad", llm.DEFAULT_SOUND_COUNT, llm.MAX_SOUND_COUNT), llm.DEFAULT_SOUND_COUNT)
 
     def test_generate_sound_ideas_returns_empty_on_error(self):
         with patch.object(
@@ -1188,10 +1188,10 @@ class TestTextStickers(unittest.TestCase):
         self.assertEqual(stickers[0]["text"], "Only 3 left")
 
     def test_generate_text_stickers_clamps_amount(self):
-        self.assertEqual(llm._normalize_sticker_count(999), llm.MAX_STICKER_COUNT)
-        self.assertEqual(llm._normalize_sticker_count(0), 1)
+        self.assertEqual(llm._clamp_count(999, llm.DEFAULT_STICKER_COUNT, llm.MAX_STICKER_COUNT), llm.MAX_STICKER_COUNT)
+        self.assertEqual(llm._clamp_count(0, llm.DEFAULT_STICKER_COUNT, llm.MAX_STICKER_COUNT), 1)
         self.assertEqual(
-            llm._normalize_sticker_count("bad"), llm.DEFAULT_STICKER_COUNT
+            llm._clamp_count("bad", llm.DEFAULT_STICKER_COUNT, llm.MAX_STICKER_COUNT), llm.DEFAULT_STICKER_COUNT
         )
 
     def test_generate_text_stickers_returns_empty_on_error(self):
@@ -1254,9 +1254,9 @@ class TestCoverTextIdeas(unittest.TestCase):
         self.assertEqual(ideas[0]["text"], "Don't buy until you see this")
 
     def test_generate_cover_text_clamps_amount(self):
-        self.assertEqual(llm._normalize_cover_count(999), llm.MAX_COVER_COUNT)
-        self.assertEqual(llm._normalize_cover_count(0), 1)
-        self.assertEqual(llm._normalize_cover_count("bad"), llm.DEFAULT_COVER_COUNT)
+        self.assertEqual(llm._clamp_count(999, llm.DEFAULT_COVER_COUNT, llm.MAX_COVER_COUNT), llm.MAX_COVER_COUNT)
+        self.assertEqual(llm._clamp_count(0, llm.DEFAULT_COVER_COUNT, llm.MAX_COVER_COUNT), 1)
+        self.assertEqual(llm._clamp_count("bad", llm.DEFAULT_COVER_COUNT, llm.MAX_COVER_COUNT), llm.DEFAULT_COVER_COUNT)
 
     def test_generate_cover_text_returns_empty_on_error(self):
         with patch.object(
@@ -1320,10 +1320,10 @@ class TestPostingSchedule(unittest.TestCase):
         self.assertEqual(slots[0]["time"], "9:00-10:00 PM")
 
     def test_generate_posting_schedule_clamps_amount(self):
-        self.assertEqual(llm._normalize_schedule_count(999), llm.MAX_SCHEDULE_COUNT)
-        self.assertEqual(llm._normalize_schedule_count(0), 1)
+        self.assertEqual(llm._clamp_count(999, llm.DEFAULT_SCHEDULE_COUNT, llm.MAX_SCHEDULE_COUNT), llm.MAX_SCHEDULE_COUNT)
+        self.assertEqual(llm._clamp_count(0, llm.DEFAULT_SCHEDULE_COUNT, llm.MAX_SCHEDULE_COUNT), 1)
         self.assertEqual(
-            llm._normalize_schedule_count("bad"), llm.DEFAULT_SCHEDULE_COUNT
+            llm._clamp_count("bad", llm.DEFAULT_SCHEDULE_COUNT, llm.MAX_SCHEDULE_COUNT), llm.DEFAULT_SCHEDULE_COUNT
         )
 
     def test_generate_posting_schedule_returns_empty_on_error(self):
@@ -1386,11 +1386,11 @@ class TestPinnedComments(unittest.TestCase):
 
     def test_generate_pinned_comments_clamps_amount(self):
         self.assertEqual(
-            llm._normalize_pinned_comment_count(999), llm.MAX_PINNED_COMMENT_COUNT
+            llm._clamp_count(999, llm.DEFAULT_PINNED_COMMENT_COUNT, llm.MAX_PINNED_COMMENT_COUNT), llm.MAX_PINNED_COMMENT_COUNT
         )
-        self.assertEqual(llm._normalize_pinned_comment_count(0), 1)
+        self.assertEqual(llm._clamp_count(0, llm.DEFAULT_PINNED_COMMENT_COUNT, llm.MAX_PINNED_COMMENT_COUNT), 1)
         self.assertEqual(
-            llm._normalize_pinned_comment_count("bad"),
+            llm._clamp_count("bad", llm.DEFAULT_PINNED_COMMENT_COUNT, llm.MAX_PINNED_COMMENT_COUNT),
             llm.DEFAULT_PINNED_COMMENT_COUNT,
         )
 
@@ -1454,11 +1454,11 @@ class TestDisclosureLines(unittest.TestCase):
 
     def test_generate_disclosure_lines_clamps_amount(self):
         self.assertEqual(
-            llm._normalize_disclosure_count(999), llm.MAX_DISCLOSURE_COUNT
+            llm._clamp_count(999, llm.DEFAULT_DISCLOSURE_COUNT, llm.MAX_DISCLOSURE_COUNT), llm.MAX_DISCLOSURE_COUNT
         )
-        self.assertEqual(llm._normalize_disclosure_count(0), 1)
+        self.assertEqual(llm._clamp_count(0, llm.DEFAULT_DISCLOSURE_COUNT, llm.MAX_DISCLOSURE_COUNT), 1)
         self.assertEqual(
-            llm._normalize_disclosure_count("bad"), llm.DEFAULT_DISCLOSURE_COUNT
+            llm._clamp_count("bad", llm.DEFAULT_DISCLOSURE_COUNT, llm.MAX_DISCLOSURE_COUNT), llm.DEFAULT_DISCLOSURE_COUNT
         )
 
     def test_generate_disclosure_lines_returns_empty_on_error(self):

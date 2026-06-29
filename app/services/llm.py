@@ -902,6 +902,32 @@ def _clamp_text(text, max_length: int) -> str:
     return value
 
 
+def _clamp_count(amount, default: int, max_count: int) -> int:
+    """Coerce a requested item count into the range [1, ``max_count``], falling
+    back to ``default`` when ``amount`` is not a usable integer. Shared by every
+    affiliate generator that takes an ``amount`` argument."""
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return default
+    return max(1, min(max_count, amount))
+
+
+def _coerce_keyed_dict(item, keys, required_keys, max_length: int) -> dict:
+    """Normalize one LLM-returned item into a fixed ``{key: str}`` shape.
+
+    Keeps only ``keys`` (clamped to ``max_length`` each) and drops the item
+    (returns ``{}``) when it is not a dict or any of ``required_keys`` is empty.
+    Shared by the affiliate generators that expect a JSON array of objects.
+    """
+    if not isinstance(item, dict):
+        return {}
+    out = {key: _clamp_text(item.get(key, ""), max_length) for key in keys}
+    if any(not out.get(key) for key in required_keys):
+        return {}
+    return out
+
+
 def _normalize_hashtags(raw, count: int) -> List[str]:
     """
     将 LLM 返回的 hashtag 统一整理成 `#tag` 格式。
@@ -1093,28 +1119,6 @@ MAX_PRODUCT_FIELD_LENGTH = 200
 PRODUCT_IDEA_KEYS = ("product", "category", "reason", "audience", "angle")
 
 
-def _normalize_product_idea_count(amount) -> int:
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError):
-        return DEFAULT_PRODUCT_IDEA_COUNT
-    return max(1, min(MAX_PRODUCT_IDEA_COUNT, amount))
-
-
-def _coerce_product_idea(item) -> dict:
-    """Normalize one LLM-returned idea into the fixed {key: str} shape, dropping
-    items that are not dicts or have no product name."""
-    if not isinstance(item, dict):
-        return {}
-    idea = {}
-    for key in PRODUCT_IDEA_KEYS:
-        value = item.get(key, "")
-        idea[key] = _clamp_text(value, MAX_PRODUCT_FIELD_LENGTH)
-    if not idea["product"]:
-        return {}
-    return idea
-
-
 def _generate_json_object_list(prompt: str, coerce, label: str) -> List[dict]:
     """Shared retry loop for the affiliate generators that expect a JSON array of
     objects back from the LLM.
@@ -1171,7 +1175,7 @@ def generate_product_ideas(
     real-time sales data. On repeated failure an empty list is returned so the
     caller can show a friendly message rather than crash.
     """
-    amount = _normalize_product_idea_count(amount)
+    amount = _clamp_count(amount, DEFAULT_PRODUCT_IDEA_COUNT, MAX_PRODUCT_IDEA_COUNT)
     category = _limit_social_text(category, MAX_SOCIAL_SUBJECT_LENGTH, "category")
     market = _limit_social_text(market, MAX_SOCIAL_SUBJECT_LENGTH, "market")
     language = (language or "").strip()
@@ -1219,7 +1223,11 @@ Suggest {amount} product ideas that tend to sell well for TikTok affiliate marke
         f"generating product ideas: category={category!r}, market={market!r}, amount={amount}"
     )
 
-    ideas = _generate_json_object_list(prompt, _coerce_product_idea, "product ideas")
+    ideas = _generate_json_object_list(
+        prompt,
+        lambda x: _coerce_keyed_dict(x, PRODUCT_IDEA_KEYS, ("product",), MAX_PRODUCT_FIELD_LENGTH),
+        "product ideas",
+    )
     return ideas[:amount]
 
 
@@ -1234,14 +1242,6 @@ Suggest {amount} product ideas that tend to sell well for TikTok affiliate marke
 DEFAULT_HOOK_COUNT = 5
 MAX_HOOK_COUNT = 10
 MAX_HOOK_LENGTH = 200
-
-
-def _normalize_hook_count(amount) -> int:
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError):
-        return DEFAULT_HOOK_COUNT
-    return max(1, min(MAX_HOOK_COUNT, amount))
 
 
 def _coerce_hook(item) -> str:
@@ -1271,7 +1271,7 @@ def generate_hook_variations(
     an empty list is returned so the caller can show a friendly message rather
     than crash.
     """
-    amount = _normalize_hook_count(amount)
+    amount = _clamp_count(amount, DEFAULT_HOOK_COUNT, MAX_HOOK_COUNT)
     video_subject = _limit_social_text(
         video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
     )
@@ -1363,28 +1363,6 @@ MAX_SHOT_FIELD_LENGTH = 200
 SHOT_KEYS = ("scene", "voiceover", "onscreen_text", "broll")
 
 
-def _normalize_shot_count(amount) -> int:
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError):
-        return DEFAULT_SHOT_COUNT
-    return max(1, min(MAX_SHOT_COUNT, amount))
-
-
-def _coerce_shot(item) -> dict:
-    """Normalize one LLM-returned shot into the fixed {key: str} shape, dropping
-    items that are not dicts or describe no scene to film."""
-    if not isinstance(item, dict):
-        return {}
-    shot = {}
-    for key in SHOT_KEYS:
-        value = item.get(key, "")
-        shot[key] = _clamp_text(value, MAX_SHOT_FIELD_LENGTH)
-    if not shot["scene"]:
-        return {}
-    return shot
-
-
 def generate_shot_list(
     video_subject: str,
     video_script: str = "",
@@ -1398,7 +1376,7 @@ def generate_shot_list(
     creator can film them top to bottom. On repeated failure an empty list is
     returned so the caller can show a friendly message rather than crash.
     """
-    amount = _normalize_shot_count(amount)
+    amount = _clamp_count(amount, DEFAULT_SHOT_COUNT, MAX_SHOT_COUNT)
     video_subject = _limit_social_text(
         video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
     )
@@ -1451,7 +1429,11 @@ Turn a short affiliate video about "{video_subject}" into a clear shot-by-shot s
         f"has_script={bool(video_script)}, language={language!r}"
     )
 
-    shots = _generate_json_object_list(prompt, _coerce_shot, "shots")
+    shots = _generate_json_object_list(
+        prompt,
+        lambda x: _coerce_keyed_dict(x, SHOT_KEYS, ("scene",), MAX_SHOT_FIELD_LENGTH),
+        "shots",
+    )
     return shots[:amount]
 
 
@@ -1470,28 +1452,6 @@ MAX_COMMENT_REPLY_FIELD_LENGTH = 300
 COMMENT_REPLY_KEYS = ("comment", "reply")
 
 
-def _normalize_comment_reply_count(amount) -> int:
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError):
-        return DEFAULT_COMMENT_REPLY_COUNT
-    return max(1, min(MAX_COMMENT_REPLY_COUNT, amount))
-
-
-def _coerce_comment_reply(item) -> dict:
-    """Normalize one LLM-returned pair into the fixed {comment, reply} shape,
-    dropping items that are not dicts or are missing either side."""
-    if not isinstance(item, dict):
-        return {}
-    pair = {}
-    for key in COMMENT_REPLY_KEYS:
-        value = item.get(key, "")
-        pair[key] = _clamp_text(value, MAX_COMMENT_REPLY_FIELD_LENGTH)
-    if not pair["comment"] or not pair["reply"]:
-        return {}
-    return pair
-
-
 def generate_comment_replies(
     video_subject: str,
     language: str = "",
@@ -1504,7 +1464,7 @@ def generate_comment_replies(
     On repeated failure an empty list is returned so the caller can show a
     friendly message rather than crash.
     """
-    amount = _normalize_comment_reply_count(amount)
+    amount = _clamp_count(amount, DEFAULT_COMMENT_REPLY_COUNT, MAX_COMMENT_REPLY_COUNT)
     video_subject = _limit_social_text(
         video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
     )
@@ -1546,7 +1506,9 @@ Predict {amount} of the most common comments viewers leave on a short affiliate 
     )
 
     replies = _generate_json_object_list(
-        prompt, _coerce_comment_reply, "comment replies"
+        prompt,
+        lambda x: _coerce_keyed_dict(x, COMMENT_REPLY_KEYS, ("comment", "reply"), MAX_COMMENT_REPLY_FIELD_LENGTH),
+        "comment replies",
     )
     return replies[:amount]
 
@@ -1566,28 +1528,6 @@ MAX_SOUND_FIELD_LENGTH = 200
 SOUND_KEYS = ("sound", "vibe", "search", "tip")
 
 
-def _normalize_sound_count(amount) -> int:
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError):
-        return DEFAULT_SOUND_COUNT
-    return max(1, min(MAX_SOUND_COUNT, amount))
-
-
-def _coerce_sound_idea(item) -> dict:
-    """Normalize one LLM-returned sound idea into the fixed {key: str} shape,
-    dropping items that are not dicts or describe no sound."""
-    if not isinstance(item, dict):
-        return {}
-    idea = {}
-    for key in SOUND_KEYS:
-        value = item.get(key, "")
-        idea[key] = _clamp_text(value, MAX_SOUND_FIELD_LENGTH)
-    if not idea["sound"]:
-        return {}
-    return idea
-
-
 def generate_sound_ideas(
     video_subject: str,
     language: str = "",
@@ -1601,7 +1541,7 @@ def generate_sound_ideas(
     NOT a real-time trending chart. On repeated failure an empty list is returned
     so the caller can show a friendly message rather than crash.
     """
-    amount = _normalize_sound_count(amount)
+    amount = _clamp_count(amount, DEFAULT_SOUND_COUNT, MAX_SOUND_COUNT)
     video_subject = _limit_social_text(
         video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
     )
@@ -1643,7 +1583,11 @@ Suggest {amount} sound / music styles that would fit a short affiliate video abo
         f"language={language!r}"
     )
 
-    ideas = _generate_json_object_list(prompt, _coerce_sound_idea, "sound ideas")
+    ideas = _generate_json_object_list(
+        prompt,
+        lambda x: _coerce_keyed_dict(x, SOUND_KEYS, ("sound",), MAX_SOUND_FIELD_LENGTH),
+        "sound ideas",
+    )
     return ideas[:amount]
 
 
@@ -1651,28 +1595,6 @@ DEFAULT_STICKER_COUNT = 5
 MAX_STICKER_COUNT = 10
 MAX_STICKER_FIELD_LENGTH = 200
 STICKER_KEYS = ("text", "timing", "style", "purpose")
-
-
-def _normalize_sticker_count(amount) -> int:
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError):
-        return DEFAULT_STICKER_COUNT
-    return max(1, min(MAX_STICKER_COUNT, amount))
-
-
-def _coerce_sticker_idea(item) -> dict:
-    """Normalize one LLM-returned text-sticker idea into the fixed {key: str}
-    shape, dropping items that are not dicts or carry no on-screen text."""
-    if not isinstance(item, dict):
-        return {}
-    idea = {}
-    for key in STICKER_KEYS:
-        value = item.get(key, "")
-        idea[key] = _clamp_text(value, MAX_STICKER_FIELD_LENGTH)
-    if not idea["text"]:
-        return {}
-    return idea
 
 
 def generate_text_stickers(
@@ -1689,7 +1611,7 @@ def generate_text_stickers(
     repeated failure an empty list is returned so the caller can show a friendly
     message rather than crash.
     """
-    amount = _normalize_sticker_count(amount)
+    amount = _clamp_count(amount, DEFAULT_STICKER_COUNT, MAX_STICKER_COUNT)
     video_subject = _limit_social_text(
         video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
     )
@@ -1732,7 +1654,9 @@ Write {amount} short on-screen text stickers (captions the creator overlays on t
     )
 
     stickers = _generate_json_object_list(
-        prompt, _coerce_sticker_idea, "text stickers"
+        prompt,
+        lambda x: _coerce_keyed_dict(x, STICKER_KEYS, ("text",), MAX_STICKER_FIELD_LENGTH),
+        "text stickers",
     )
     return stickers[:amount]
 
@@ -1741,28 +1665,6 @@ DEFAULT_COVER_COUNT = 4
 MAX_COVER_COUNT = 8
 MAX_COVER_FIELD_LENGTH = 200
 COVER_KEYS = ("text", "subtext", "angle", "tip")
-
-
-def _normalize_cover_count(amount) -> int:
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError):
-        return DEFAULT_COVER_COUNT
-    return max(1, min(MAX_COVER_COUNT, amount))
-
-
-def _coerce_cover_idea(item) -> dict:
-    """Normalize one LLM-returned cover-text idea into the fixed {key: str}
-    shape, dropping items that are not dicts or carry no headline text."""
-    if not isinstance(item, dict):
-        return {}
-    idea = {}
-    for key in COVER_KEYS:
-        value = item.get(key, "")
-        idea[key] = _clamp_text(value, MAX_COVER_FIELD_LENGTH)
-    if not idea["text"]:
-        return {}
-    return idea
 
 
 def generate_cover_text_ideas(
@@ -1780,7 +1682,7 @@ def generate_cover_text_ideas(
     note. On repeated failure an empty list is returned so the caller can show a
     friendly message rather than crash.
     """
-    amount = _normalize_cover_count(amount)
+    amount = _clamp_count(amount, DEFAULT_COVER_COUNT, MAX_COVER_COUNT)
     video_subject = _limit_social_text(
         video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
     )
@@ -1822,7 +1724,11 @@ Write {amount} cover (thumbnail) headline options for a short affiliate video ab
         f"language={language!r}"
     )
 
-    ideas = _generate_json_object_list(prompt, _coerce_cover_idea, "cover text ideas")
+    ideas = _generate_json_object_list(
+        prompt,
+        lambda x: _coerce_keyed_dict(x, COVER_KEYS, ("text",), MAX_COVER_FIELD_LENGTH),
+        "cover text ideas",
+    )
     return ideas[:amount]
 
 
@@ -1830,28 +1736,6 @@ DEFAULT_SCHEDULE_COUNT = 4
 MAX_SCHEDULE_COUNT = 8
 MAX_SCHEDULE_FIELD_LENGTH = 200
 SCHEDULE_KEYS = ("slot", "day", "time", "why")
-
-
-def _normalize_schedule_count(amount) -> int:
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError):
-        return DEFAULT_SCHEDULE_COUNT
-    return max(1, min(MAX_SCHEDULE_COUNT, amount))
-
-
-def _coerce_schedule_slot(item) -> dict:
-    """Normalize one LLM-returned posting-time slot into the fixed {key: str}
-    shape, dropping items that are not dicts or carry no time window."""
-    if not isinstance(item, dict):
-        return {}
-    slot = {}
-    for key in SCHEDULE_KEYS:
-        value = item.get(key, "")
-        slot[key] = _clamp_text(value, MAX_SCHEDULE_FIELD_LENGTH)
-    if not slot["time"]:
-        return {}
-    return slot
 
 
 def generate_posting_schedule(
@@ -1870,7 +1754,7 @@ def generate_posting_schedule(
     empty list is returned so the caller can show a friendly message rather than
     crash.
     """
-    amount = _normalize_schedule_count(amount)
+    amount = _clamp_count(amount, DEFAULT_SCHEDULE_COUNT, MAX_SCHEDULE_COUNT)
     video_subject = _limit_social_text(
         video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
     )
@@ -1921,7 +1805,9 @@ Suggest {amount} best-practice posting time windows for a short affiliate video 
     )
 
     slots = _generate_json_object_list(
-        prompt, _coerce_schedule_slot, "posting schedule"
+        prompt,
+        lambda x: _coerce_keyed_dict(x, SCHEDULE_KEYS, ("time",), MAX_SCHEDULE_FIELD_LENGTH),
+        "posting schedule",
     )
     return slots[:amount]
 
@@ -1930,28 +1816,6 @@ DEFAULT_PINNED_COMMENT_COUNT = 4
 MAX_PINNED_COMMENT_COUNT = 8
 MAX_PINNED_COMMENT_FIELD_LENGTH = 300
 PINNED_COMMENT_KEYS = ("comment", "cta", "tip")
-
-
-def _normalize_pinned_comment_count(amount) -> int:
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError):
-        return DEFAULT_PINNED_COMMENT_COUNT
-    return max(1, min(MAX_PINNED_COMMENT_COUNT, amount))
-
-
-def _coerce_pinned_comment(item) -> dict:
-    """Normalize one LLM-returned pinned-comment idea into the fixed {key: str}
-    shape, dropping items that are not dicts or carry no comment text."""
-    if not isinstance(item, dict):
-        return {}
-    pinned = {}
-    for key in PINNED_COMMENT_KEYS:
-        value = item.get(key, "")
-        pinned[key] = _clamp_text(value, MAX_PINNED_COMMENT_FIELD_LENGTH)
-    if not pinned["comment"]:
-        return {}
-    return pinned
 
 
 def generate_pinned_comments(
@@ -1970,7 +1834,7 @@ def generate_pinned_comments(
     answers viewers. On repeated failure an empty list is returned so the caller
     can show a friendly message rather than crash.
     """
-    amount = _normalize_pinned_comment_count(amount)
+    amount = _clamp_count(amount, DEFAULT_PINNED_COMMENT_COUNT, MAX_PINNED_COMMENT_COUNT)
     video_subject = _limit_social_text(
         video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
     )
@@ -2014,7 +1878,9 @@ Write {amount} options for the creator's OWN first comment to pin to the top of 
     )
 
     pinned = _generate_json_object_list(
-        prompt, _coerce_pinned_comment, "pinned comments"
+        prompt,
+        lambda x: _coerce_keyed_dict(x, PINNED_COMMENT_KEYS, ("comment",), MAX_PINNED_COMMENT_FIELD_LENGTH),
+        "pinned comments",
     )
     return pinned[:amount]
 
@@ -2023,28 +1889,6 @@ DEFAULT_DISCLOSURE_COUNT = 3
 MAX_DISCLOSURE_COUNT = 6
 MAX_DISCLOSURE_FIELD_LENGTH = 300
 DISCLOSURE_KEYS = ("line", "placement", "note")
-
-
-def _normalize_disclosure_count(amount) -> int:
-    try:
-        amount = int(amount)
-    except (TypeError, ValueError):
-        return DEFAULT_DISCLOSURE_COUNT
-    return max(1, min(MAX_DISCLOSURE_COUNT, amount))
-
-
-def _coerce_disclosure_line(item) -> dict:
-    """Normalize one LLM-returned affiliate-disclosure option into the fixed
-    {key: str} shape, dropping items that are not dicts or carry no line text."""
-    if not isinstance(item, dict):
-        return {}
-    disclosure = {}
-    for key in DISCLOSURE_KEYS:
-        value = item.get(key, "")
-        disclosure[key] = _clamp_text(value, MAX_DISCLOSURE_FIELD_LENGTH)
-    if not disclosure["line"]:
-        return {}
-    return disclosure
 
 
 def generate_disclosure_lines(
@@ -2063,7 +1907,7 @@ def generate_disclosure_lines(
     ``note`` a short compliance reminder. On repeated failure an empty list is
     returned so the caller can show a friendly message rather than crash.
     """
-    amount = _normalize_disclosure_count(amount)
+    amount = _clamp_count(amount, DEFAULT_DISCLOSURE_COUNT, MAX_DISCLOSURE_COUNT)
     video_subject = _limit_social_text(
         video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
     )
@@ -2106,7 +1950,9 @@ Write {amount} ready-to-use affiliate / paid-partnership DISCLOSURE options for 
     )
 
     lines = _generate_json_object_list(
-        prompt, _coerce_disclosure_line, "disclosure lines"
+        prompt,
+        lambda x: _coerce_keyed_dict(x, DISCLOSURE_KEYS, ("line",), MAX_DISCLOSURE_FIELD_LENGTH),
+        "disclosure lines",
     )
     return lines[:amount]
 
