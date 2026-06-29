@@ -99,6 +99,25 @@ class TestBuildAffiliatePackageText(unittest.TestCase):
         self.assertIn("cover_angle: benefit", out)
         self.assertIn("cover_tip: bright frame", out)
 
+    def test_campaign_section_and_cta(self):
+        campaign = {
+            "product": "Mini blender",
+            "price": "199k",
+            "code": "SALE10",
+            "link": "https://shp.ee/abc",
+        }
+        out = _build(campaign=campaign)
+        # details section uses the campaign field labels
+        self.assertIn("campaign_product_label: Mini blender", out)
+        self.assertIn("campaign_code_label: SALE10", out)
+        # the verbatim link and code survive into the export
+        self.assertIn("https://shp.ee/abc", out)
+        self.assertIn("SALE10", out)
+
+    def test_empty_campaign_adds_no_section(self):
+        self.assertEqual(_build(campaign=None).strip(), "")
+        self.assertEqual(_build(campaign={}).strip(), "")
+
     def test_schedule_slots(self):
         slots = [
             {

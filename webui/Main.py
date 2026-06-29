@@ -27,6 +27,11 @@ from app.models.schema import (
 from app.services import llm, voice
 from app.services import task as tm
 from app.services.affiliate import build_affiliate_package_text, format_schedule_header
+from app.services.campaign import (
+    CAMPAIGN_FIELDS,
+    format_campaign_cta,
+    has_campaign,
+)
 from app.services.fonts import get_recommended_font
 from app.utils import utils
 
@@ -322,6 +327,26 @@ locales = utils.load_locales(i18n_dir)
 def tr(key):
     loc = locales.get(st.session_state["ui_language"], {})
     return loc.get("Translation", {}).get(key, key)
+
+
+def _campaign_values():
+    """Collect the campaign fields the user typed into the keyed widgets so the
+    export bundle and CTA preview read the same single source of truth."""
+    return {key: st.session_state.get(f"campaign_{key}", "") for key in CAMPAIGN_FIELDS}
+
+
+def _campaign_label(key):
+    """Translate the campaign section/field keys used by app.services.campaign and
+    the export bundle. Single source so the panel CTA and the export agree."""
+    return {
+        "campaign": tr("Affiliate Campaign"),
+        "campaign_cta": tr("Campaign CTA"),
+        "campaign_product_label": tr("Campaign Product"),
+        "campaign_price_label": tr("Campaign Price"),
+        "campaign_code_label": tr("Campaign Code"),
+        "campaign_link_label": tr("Campaign Link"),
+        "campaign_shop_label": tr("Campaign Shop"),
+    }.get(key, key)
 
 
 def render_detail_fields(item, fields):
@@ -847,6 +872,31 @@ with left_panel:
                         st.rerun()
         elif "product_ideas" in st.session_state:
             st.info(tr("No Product Ideas"))
+
+    # Affiliate campaign — the single source of truth for the product's exact
+    # link, discount code and price. Kept deterministic (never sent to the LLM)
+    # and reused by the Export Copy bundle + the pasteable CTA below.
+    with st.container(border=True):
+        st.write(tr("Affiliate Campaign"))
+        st.caption(tr("Affiliate Campaign Hint"))
+        camp_cols = st.columns([0.6, 0.4])
+        with camp_cols[0]:
+            st.text_input(tr("Campaign Product"), key="campaign_product")
+        with camp_cols[1]:
+            st.text_input(tr("Campaign Price"), key="campaign_price")
+        camp_cols2 = st.columns(2)
+        with camp_cols2[0]:
+            st.text_input(tr("Campaign Code"), key="campaign_code")
+        with camp_cols2[1]:
+            st.text_input(tr("Campaign Shop"), key="campaign_shop")
+        st.text_input(tr("Campaign Link"), key="campaign_link")
+
+        campaign = _campaign_values()
+        if has_campaign(campaign):
+            cta = format_campaign_cta(campaign, _campaign_label)
+            st.caption(tr("Campaign CTA Preview"))
+            st.code(cta, language=None)
+            st.caption(tr("Campaign CTA Hint"))
 
     with st.container(border=True):
         st.write(tr("Video Script Settings"))
@@ -1542,7 +1592,8 @@ with left_panel:
                 schedule_slots=st.session_state.get("schedule_slots") or [],
                 pinned_comments=st.session_state.get("pinned_comments") or [],
                 disclosure_lines=st.session_state.get("disclosure_lines") or [],
-                label=lambda key: _section_labels.get(key, key),
+                campaign=_campaign_values(),
+                label=lambda key: _section_labels.get(key, _campaign_label(key)),
             )
             has_content = bool(package_text.strip())
             if has_content:

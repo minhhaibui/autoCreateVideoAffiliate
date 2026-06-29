@@ -5,6 +5,9 @@ Streamlit (importing Main.py executes Streamlit page setup at module load).
 """
 
 
+from app.services.campaign import build_campaign_section, format_campaign_cta
+
+
 def format_schedule_header(slot) -> str:
     """One-line header for a posting-schedule slot, joining its time-window label
     and clock time with an em dash and skipping whichever part is missing. Shared
@@ -27,6 +30,7 @@ def build_affiliate_package_text(
     schedule_slots=None,
     pinned_comments=None,
     disclosure_lines=None,
+    campaign=None,
 ):
     """Assemble all generated affiliate assets into one plain-text document the
     user can download/keep. ``label`` maps section keys to translated headings so
@@ -40,6 +44,9 @@ def build_affiliate_package_text(
             lines.append(body)
             lines.append("")
 
+    # Campaign first: it holds the verbatim link/code everything else points to.
+    section(label("campaign"), build_campaign_section(campaign, label))
+    section(label("campaign_cta"), format_campaign_cta(campaign, label))
     section(label("subject"), subject)
     if hooks:
         numbered = "\n".join(f"{i + 1}. {h}" for i, h in enumerate(hooks))

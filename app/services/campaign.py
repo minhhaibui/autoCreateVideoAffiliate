@@ -1,0 +1,69 @@
+"""Affiliate campaign helpers — the single source of truth for one product's
+exact affiliate link, discount code, price and shop.
+
+These values must be reproduced VERBATIM (an affiliate link or discount code that
+the LLM paraphrases is worthless or, worse, wrong), so nothing here ever touches
+the language model: all formatting is deterministic and unit-tested. The same
+campaign feeds the export bundle, the pinned-comment / caption CTA and — later —
+the on-screen CTA burned into the video, so the link and code can never drift
+between surfaces.
+"""
+
+# Order matters: this is also the top-to-bottom order fields render in.
+CAMPAIGN_FIELDS = ("product", "price", "code", "link", "shop")
+
+
+def normalize_campaign(raw) -> dict:
+    """Return every campaign field as a trimmed string, with missing keys as ''."""
+    raw = raw or {}
+    return {key: str(raw.get(key, "") or "").strip() for key in CAMPAIGN_FIELDS}
+
+
+def has_campaign(campaign) -> bool:
+    """True when at least one campaign field carries a value."""
+    data = normalize_campaign(campaign)
+    return any(data[key] for key in CAMPAIGN_FIELDS)
+
+
+def format_campaign_cta(campaign, label) -> str:
+    """A ready-to-paste call-to-action block built ONLY from the user's exact
+    values — link and code are copied verbatim, never generated. Empty fields are
+    skipped. ``label`` maps keys to translated words so the CTA follows the UI
+    language. Returns '' when the campaign is empty.
+
+    Shaped for a TikTok pinned comment / caption: emoji anchors + short lines.
+    """
+    data = normalize_campaign(campaign)
+    lines = []
+
+    if data["product"]:
+        head = data["product"]
+        if data["price"]:
+            head += f" — {data['price']}"
+        lines.append(f"🛒 {head}")
+    elif data["price"]:
+        lines.append(f"🛒 {data['price']}")
+
+    if data["code"]:
+        lines.append(f"🎁 {label('campaign_code_label')}: {data['code']}")
+    if data["link"]:
+        lines.append(f"👉 {label('campaign_link_label')}: {data['link']}")
+    if data["shop"]:
+        lines.append(f"🏪 {data['shop']}")
+
+    return "\n".join(lines)
+
+
+def build_campaign_section(campaign, label) -> str:
+    """A plain-text details block for the export bundle: every present field on
+    its own labelled line. Returns '' when the campaign is empty."""
+    data = normalize_campaign(campaign)
+    rows = [
+        ("campaign_product_label", data["product"]),
+        ("campaign_price_label", data["price"]),
+        ("campaign_code_label", data["code"]),
+        ("campaign_link_label", data["link"]),
+        ("campaign_shop_label", data["shop"]),
+    ]
+    lines = [f"{label(key)}: {value}" for key, value in rows if value]
+    return "\n".join(lines)
