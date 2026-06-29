@@ -323,6 +323,17 @@ def tr(key):
     loc = locales.get(st.session_state["ui_language"], {})
     return loc.get("Translation", {}).get(key, key)
 
+
+def render_detail_fields(item, fields):
+    """Render each present optional field of a generated affiliate item as a
+    bold-labelled markdown line. ``fields`` is a list of (item_key, tr_label_key)
+    pairs; empty/missing values are skipped. Shared by the toolkit result panels
+    so their detail rows stay identical."""
+    for item_key, label_key in fields:
+        value = item.get(item_key)
+        if value:
+            st.markdown(f"**{tr(label_key)}:** {value}")
+
 @st.cache_data(ttl=300, show_spinner=False)
 def get_groq_model_ids(api_key: str, base_url: str) -> list[str]:
     if not api_key:
@@ -821,12 +832,14 @@ with left_panel:
                     + (f"  ·  {idea.get('category', '')}" if idea.get("category") else ""),
                     expanded=(i == 0),
                 ):
-                    if idea.get("reason"):
-                        st.markdown(f"**{tr('Why it sells')}:** {idea['reason']}")
-                    if idea.get("audience"):
-                        st.markdown(f"**{tr('Audience')}:** {idea['audience']}")
-                    if idea.get("angle"):
-                        st.markdown(f"**{tr('Video Angle')}:** {idea['angle']}")
+                    render_detail_fields(
+                        idea,
+                        [
+                            ("reason", "Why it sells"),
+                            ("audience", "Audience"),
+                            ("angle", "Video Angle"),
+                        ],
+                    )
                     if st.button(
                         tr("Use as Subject"), key=f"use_product_idea_{i}"
                     ):
@@ -1078,16 +1091,14 @@ with left_panel:
                         f"{tr('Shot')} {i + 1} — {shot.get('scene', '')}",
                         expanded=(i == 0),
                     ):
-                        if shot.get("voiceover"):
-                            st.markdown(
-                                f"**{tr('Shot Voiceover')}:** {shot['voiceover']}"
-                            )
-                        if shot.get("onscreen_text"):
-                            st.markdown(
-                                f"**{tr('Shot On-screen Text')}:** {shot['onscreen_text']}"
-                            )
-                        if shot.get("broll"):
-                            st.markdown(f"**{tr('Shot B-roll')}:** {shot['broll']}")
+                        render_detail_fields(
+                            shot,
+                            [
+                                ("voiceover", "Shot Voiceover"),
+                                ("onscreen_text", "Shot On-screen Text"),
+                                ("broll", "Shot B-roll"),
+                            ],
+                        )
                 st.caption(tr("Shot List Use Hint"))
             elif "video_shots" in st.session_state:
                 st.info(tr("No Shots"))
@@ -1223,10 +1234,10 @@ with left_panel:
                 for i, slot in enumerate(schedule_slots):
                     header = format_schedule_header(slot)
                     with st.expander(f"🕒 {header}", expanded=(i == 0)):
-                        if slot.get("day"):
-                            st.markdown(f"**{tr('Schedule Day')}:** {slot['day']}")
-                        if slot.get("why"):
-                            st.markdown(f"**{tr('Schedule Why')}:** {slot['why']}")
+                        render_detail_fields(
+                            slot,
+                            [("day", "Schedule Day"), ("why", "Schedule Why")],
+                        )
                 st.caption(tr("Posting Schedule Use Hint"))
             elif "schedule_slots" in st.session_state:
                 st.info(tr("No Posting Schedule"))
@@ -1272,10 +1283,10 @@ with left_panel:
                             height=80,
                             label_visibility="collapsed",
                         )
-                        if pinned.get("cta"):
-                            st.markdown(f"**{tr('Pinned CTA')}:** {pinned['cta']}")
-                        if pinned.get("tip"):
-                            st.markdown(f"**{tr('Pinned Tip')}:** {pinned['tip']}")
+                        render_detail_fields(
+                            pinned,
+                            [("cta", "Pinned CTA"), ("tip", "Pinned Tip")],
+                        )
                 st.caption(tr("Pinned Comment Use Hint"))
             elif "pinned_comments" in st.session_state:
                 st.info(tr("No Pinned Comments"))
@@ -1321,12 +1332,13 @@ with left_panel:
                             height=80,
                             label_visibility="collapsed",
                         )
-                        if item.get("placement"):
-                            st.markdown(
-                                f"**{tr('Disclosure Placement')}:** {item['placement']}"
-                            )
-                        if item.get("note"):
-                            st.markdown(f"**{tr('Disclosure Note')}:** {item['note']}")
+                        render_detail_fields(
+                            item,
+                            [
+                                ("placement", "Disclosure Placement"),
+                                ("note", "Disclosure Note"),
+                            ],
+                        )
                 st.caption(tr("Affiliate Disclosure Use Hint"))
             elif "disclosure_lines" in st.session_state:
                 st.info(tr("No Disclosure"))
@@ -1367,12 +1379,14 @@ with left_panel:
                         f"🎵 {idea.get('sound', '')}",
                         expanded=(i == 0),
                     ):
-                        if idea.get("vibe"):
-                            st.markdown(f"**{tr('Sound Vibe')}:** {idea['vibe']}")
-                        if idea.get("search"):
-                            st.markdown(f"**{tr('Sound Search')}:** {idea['search']}")
-                        if idea.get("tip"):
-                            st.markdown(f"**{tr('Sound Tip')}:** {idea['tip']}")
+                        render_detail_fields(
+                            idea,
+                            [
+                                ("vibe", "Sound Vibe"),
+                                ("search", "Sound Search"),
+                                ("tip", "Sound Tip"),
+                            ],
+                        )
                 st.caption(tr("Trending Sounds Use Hint"))
             elif "sound_ideas" in st.session_state:
                 st.info(tr("No Sounds"))
@@ -1408,16 +1422,14 @@ with left_panel:
                         f"💬 {sticker.get('text', '')}",
                         expanded=(i == 0),
                     ):
-                        if sticker.get("timing"):
-                            st.markdown(
-                                f"**{tr('Sticker Timing')}:** {sticker['timing']}"
-                            )
-                        if sticker.get("style"):
-                            st.markdown(f"**{tr('Sticker Style')}:** {sticker['style']}")
-                        if sticker.get("purpose"):
-                            st.markdown(
-                                f"**{tr('Sticker Purpose')}:** {sticker['purpose']}"
-                            )
+                        render_detail_fields(
+                            sticker,
+                            [
+                                ("timing", "Sticker Timing"),
+                                ("style", "Sticker Style"),
+                                ("purpose", "Sticker Purpose"),
+                            ],
+                        )
                 st.caption(tr("Text Stickers Use Hint"))
             elif "text_stickers" in st.session_state:
                 st.info(tr("No Stickers"))
@@ -1453,12 +1465,14 @@ with left_panel:
                         f"🖼️ {idea.get('text', '')}",
                         expanded=(i == 0),
                     ):
-                        if idea.get("subtext"):
-                            st.markdown(f"**{tr('Cover Subtext')}:** {idea['subtext']}")
-                        if idea.get("angle"):
-                            st.markdown(f"**{tr('Cover Angle')}:** {idea['angle']}")
-                        if idea.get("tip"):
-                            st.markdown(f"**{tr('Cover Tip')}:** {idea['tip']}")
+                        render_detail_fields(
+                            idea,
+                            [
+                                ("subtext", "Cover Subtext"),
+                                ("angle", "Cover Angle"),
+                                ("tip", "Cover Tip"),
+                            ],
+                        )
                 st.caption(tr("Cover Text Use Hint"))
             elif "cover_ideas" in st.session_state:
                 st.info(tr("No Cover Text"))
