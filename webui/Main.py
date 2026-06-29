@@ -814,16 +814,24 @@ if not config.app.get("hide_config", False):
             save_keys_to_config("coverr_api_keys", coverr_api_key)
 
 llm_provider = config.app.get("llm_provider", "").lower()
-panel = st.columns(3)
-left_panel = panel[0]
-middle_panel = panel[1]
-right_panel = panel[2]
 
 params = VideoParams(video_subject="")
 uploaded_files = []
 uploaded_audio_file = None
 
-with left_panel:
+# Three-step wizard. st.tabs runs EVERY tab body on each rerun (it only hides the
+# inactive ones with CSS), so params is still fully populated no matter which step
+# is on screen, and the persistent "Generate" footer below the tabs always works.
+# The steps follow the real affiliate workflow: set up the product & script, then
+# generate the supporting copy, then configure the video.
+step1, step2, step3 = st.tabs([
+    tr("Step 1 Product Script"),
+    tr("Step 2 Copy Assets"),
+    tr("Step 3 Video Subtitle"),
+])
+
+with step1:
+    st.caption(tr("Step 1 Caption"))
     # AI product-idea finder for TikTok affiliate. Rendered before the script
     # settings so a "use as subject" click can populate the video_subject widget
     # on the next rerun without a session-state/widget conflict.
@@ -1075,10 +1083,11 @@ with left_panel:
             tr("Video Keywords"), value=st.session_state["video_terms"]
         )
 
-    # The affiliate copy helpers are grouped into tabs to keep the left
-    # column readable. (Streamlit st.tabs still runs every panel's body each
-    # rerun and just hides the inactive ones with CSS — it's a layout aid, not
-    # lazy rendering.)
+with step2:
+    st.caption(tr("Step 2 Caption"))
+    # The affiliate copy helpers are grouped into sub-tabs to stay readable.
+    # (Streamlit st.tabs still runs every panel's body each rerun and just hides
+    # the inactive ones with CSS — it's a layout aid, not lazy rendering.)
     toolkit_tabs = st.tabs([
         tr("Toolkit Tab Content"),
         tr("Toolkit Tab Social"),
@@ -1655,7 +1664,8 @@ with left_panel:
                 st.info(tr("Nothing to Export"))
 
 
-with middle_panel:
+with step3:
+    st.caption(tr("Step 3 Caption"))
     with st.container(border=True):
         st.write(tr("Video Settings"))
         video_concat_modes = [
@@ -2069,7 +2079,7 @@ with middle_panel:
             index=2,
         )
 
-with right_panel:
+with step3:
     with st.container(border=True):
         st.write(tr("Subtitle Settings"))
         params.subtitle_enabled = st.checkbox(tr("Enable Subtitles"), value=True)
@@ -2329,7 +2339,12 @@ with right_panel:
                     config.save_config()
                     st.success(tr("Coverr API Key deleted successfully"))
 
-start_button = st.button(tr("Generate Video"), use_container_width=True, type="primary")
+# Persistent generate footer — always visible below the wizard steps so the user
+# can render from any step without hunting for the button.
+st.divider()
+start_button = st.button(
+    f"▶ {tr('Generate Video')}", use_container_width=True, type="primary"
+)
 if start_button:
     config.save_config()
     task_id = str(uuid4())
