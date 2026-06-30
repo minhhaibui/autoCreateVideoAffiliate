@@ -1537,6 +1537,49 @@ class TestSaveSharePrompts(unittest.TestCase):
             self.assertEqual(llm.generate_save_share_prompts(video_subject="x"), [])
 
 
+class TestScriptVariants(unittest.TestCase):
+    """A/B full-script variant generation (reuses generate_script per variant)."""
+
+    def test_generates_distinct_variants(self):
+        scripts = [
+            "Variant one body here.",
+            "Variant two body here.",
+            "Variant three body here.",
+        ]
+        with patch.object(llm, "generate_script", side_effect=scripts) as gs:
+            out = llm.generate_script_variants(video_subject="mini blender", amount=3)
+        self.assertEqual(out, scripts)
+        # each variant call gets a distinct opening angle appended
+        angles = [kw["video_script_prompt"] for _, kw in gs.call_args_list]
+        self.assertEqual(len(set(angles)), 3)
+
+    def test_dedupes_identical_scripts(self):
+        with patch.object(llm, "generate_script", side_effect=["Same.", "Same.", "Different."]):
+            out = llm.generate_script_variants(video_subject="x", amount=3)
+        self.assertEqual(out, ["Same.", "Different."])
+
+    def test_drops_empty_and_error_scripts(self):
+        with patch.object(
+            llm, "generate_script", side_effect=["", "Error: api_key is not set", "Good one."]
+        ):
+            out = llm.generate_script_variants(video_subject="x", amount=3)
+        self.assertEqual(out, ["Good one."])
+
+    def test_appends_angle_after_user_requirements(self):
+        with patch.object(llm, "generate_script", side_effect=["a"]) as gs:
+            llm.generate_script_variants(
+                video_subject="x", video_script_prompt="Keep it under 30s.", amount=1
+            )
+        passed = gs.call_args_list[0][1]["video_script_prompt"]
+        self.assertIn("Keep it under 30s.", passed)
+        self.assertIn("For this version", passed)
+
+    def test_clamps_amount(self):
+        with patch.object(llm, "generate_script", return_value="x") as gs:
+            llm.generate_script_variants(video_subject="x", amount=999)
+        self.assertEqual(gs.call_count, llm.MAX_SCRIPT_VARIANT_COUNT)
+
+
 class TestScriptStylePresets(unittest.TestCase):
     """Category-aware affiliate script style presets."""
 

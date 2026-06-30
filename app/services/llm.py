@@ -813,6 +813,69 @@ def generate_script(
     return final_script.strip()
 
 
+DEFAULT_SCRIPT_VARIANT_COUNT = 3
+MAX_SCRIPT_VARIANT_COUNT = 5
+
+# Distinct opening angles injected one-per-variant so the A/B scripts genuinely
+# differ in their hook rather than rephrasing the same one.
+SCRIPT_VARIANT_ANGLES = (
+    "For this version, open with a bold, surprising claim about the result.",
+    "For this version, open with a relatable problem the viewer is frustrated by.",
+    "For this version, open with a 'stop doing X' pattern-interrupt.",
+    "For this version, open with a short personal 'I wish I knew this sooner' story.",
+    "For this version, open with a curiosity gap that teases the payoff without revealing it.",
+)
+
+
+def generate_script_variants(
+    video_subject: str,
+    language: str = "",
+    paragraph_number: int = 1,
+    video_script_prompt: str = "",
+    custom_system_prompt: str = "",
+    amount: int = DEFAULT_SCRIPT_VARIANT_COUNT,
+) -> List[str]:
+    """Generate several DISTINCT full scripts (A/B variants) for the same subject,
+    each opening on a different proven angle, so the creator can test which hook
+    converts. Reuses ``generate_script`` per variant, so the selected style preset,
+    language, paragraph count and cleaning all apply unchanged — the only addition
+    is a per-variant angle appended to the user's script requirements.
+
+    Returns a de-duplicated list of script strings (error responses dropped); an
+    empty list if every attempt failed, so the caller can show a friendly message.
+    """
+    amount = _clamp_count(
+        amount, DEFAULT_SCRIPT_VARIANT_COUNT, MAX_SCRIPT_VARIANT_COUNT
+    )
+    base_requirements = (video_script_prompt or "").strip()
+
+    variants: List[str] = []
+    seen = set()
+    for i in range(amount):
+        angle = SCRIPT_VARIANT_ANGLES[i % len(SCRIPT_VARIANT_ANGLES)]
+        requirements = f"{base_requirements}\n{angle}".strip() if base_requirements else angle
+        script = generate_script(
+            video_subject=video_subject,
+            language=language,
+            paragraph_number=paragraph_number,
+            video_script_prompt=requirements,
+            custom_system_prompt=custom_system_prompt,
+        )
+        script = (script or "").strip()
+        if not script or "Error: " in script:
+            continue
+        key = " ".join(script.split()).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        variants.append(script)
+
+    logger.info(
+        f"generated {len(variants)}/{amount} script variants: subject={video_subject!r}"
+    )
+    return variants
+
+
 def generate_terms(video_subject: str, video_script: str, amount: int = 5) -> List[str]:
     prompt = f"""
 # Role: Video Search Terms Generator

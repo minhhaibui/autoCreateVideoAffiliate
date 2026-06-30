@@ -370,6 +370,15 @@ def _fill_end_card():
     )
 
 
+def _use_script_variant(index):
+    """on_click callback: load the chosen A/B script variant into the (unkeyed)
+    Video Script box, the same way the Generate-Script button seeds it — set in a
+    callback so it lands before the text_area re-instantiates on the next rerun."""
+    variants = st.session_state.get("script_variants") or []
+    if 0 <= index < len(variants):
+        st.session_state["video_script"] = variants[index]
+
+
 def render_detail_fields(item, fields):
     """Render each present optional field of a generated affiliate item as a
     bold-labelled markdown line. ``fields`` is a list of (item_key, tr_label_key)
@@ -1124,6 +1133,52 @@ with step1:
                 else:
                     st.session_state["video_script"] = script
                     st.session_state["video_terms"] = ", ".join(terms)
+
+        # A/B script variants — generate several distinct full scripts (each on a
+        # different opening angle) for the same subject so the creator can test
+        # which hook converts, then load the winner into the script box below.
+        with st.expander(tr("AB Script Variants"), expanded=False):
+            st.caption(tr("AB Script Variants Hint"))
+            variant_count = st.slider(
+                tr("Number of Variants"),
+                min_value=2,
+                max_value=llm.MAX_SCRIPT_VARIANT_COUNT,
+                value=llm.DEFAULT_SCRIPT_VARIANT_COUNT,
+                key="script_variant_count",
+            )
+            if st.button(tr("Generate AB Variants"), key="auto_generate_variants"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating AB Variants")):
+                        st.session_state["script_variants"] = (
+                            llm.generate_script_variants(
+                                video_subject=params.video_subject,
+                                language=params.video_language,
+                                paragraph_number=params.paragraph_number,
+                                video_script_prompt=params.video_script_prompt,
+                                custom_system_prompt=params.custom_system_prompt,
+                                amount=variant_count,
+                            )
+                        )
+            script_variants = st.session_state.get("script_variants") or []
+            if script_variants:
+                for i, variant in enumerate(script_variants):
+                    st.text_area(
+                        f"{tr('Variant')} {chr(65 + i)}",
+                        value=variant,
+                        height=160,
+                        disabled=True,
+                    )
+                    st.button(
+                        f"{tr('Use This Script')} ({chr(65 + i)})",
+                        key=f"use_variant_{i}",
+                        on_click=_use_script_variant,
+                        args=(i,),
+                    )
+            elif "script_variants" in st.session_state:
+                st.info(tr("No Variants"))
+
         params.video_script = st.text_area(
             tr("Video Script"), value=st.session_state["video_script"], height=280
         )
