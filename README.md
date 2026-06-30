@@ -49,6 +49,34 @@ Chỉ cần cung cấp một <b>chủ đề</b> hoặc <b>từ khóa</b> cho vid
 - [x] Tư liệu video **độ phân giải cao** và **không bản quyền**, cũng có thể dùng **tư liệu cục bộ** của bạn
 - [x] Hỗ trợ nhiều nguồn tư liệu: **Pexels**, **Pixabay**, **Coverr** (thư viện tư liệu HD/4K miễn phí, khi dùng phải tuân thủ [điều khoản giấy phép của Coverr](https://coverr.co/license), chủ yếu là khổ ngang 16:9; đăng ký tại [coverr.co/developers](https://coverr.co/developers?ctx=header_navigation), gói Demo cho 50 lượt/giờ)
 - [x] Hỗ trợ nhiều mô hình AI: **OpenAI**, **AIHubMix**, **Moonshot**, **Azure**, **gpt4free**, **one-api**, **Tongyi Qianwen**, **Google Gemini**, **Ollama**, **DeepSeek**, **MiniMax**, **Ernie (Văn Tâm Nhất Ngôn)**, **Pollinations**, **ModelScope**...
+- [x] **Bộ công cụ Affiliate TikTok** tích hợp ngay trong WebUI — xem chi tiết bên dưới 👇
+
+## Bộ công cụ Affiliate TikTok 🛒
+
+Ngoài việc tạo video, WebUI còn có một bộ công cụ giúp **bán hàng affiliate trên TikTok** hiệu quả hơn. Tất cả đều dùng chung mô hình AI bạn đã cấu hình (không cần API mới) và xoay quanh một nguyên tắc cốt lõi: **link affiliate, mã giảm giá và giá tiền luôn được giữ nguyên văn (verbatim), không bao giờ đi qua AI** để tránh sai lệch.
+
+**✍️ Kịch bản & nội dung**
+- **Tìm ý tưởng sản phẩm** affiliate theo chủ đề.
+- **Preset kịch bản theo ngành** với cấu trúc đã được chứng minh chuyển đổi cao: TikTok Affiliate (chung), Làm đẹp (Trước & Sau), Nhà cửa (Lột xác), Thời trang (Phối đồ).
+- **Biến thể kịch bản A/B** — tạo nhiều kịch bản đầy đủ với cách mở đầu khác nhau để test, rồi nạp bản ưng ý vào ô script.
+- **Hook (câu mở đầu)** — tạo nhiều hook chặn-lướt, một chạm để chèn vào đầu kịch bản.
+- **Ước tính độ dài video** & **shot list / storyboard** chia cảnh.
+
+**🎬 Yếu tố hiển thị trên video**
+- **Hook mở đầu burn lên video** — chữ hook lớn trong vài giây đầu (yếu tố quyết định giữ chân ở giây thứ 3–5).
+- **CTA xuyên suốt** — dải chữ CTA (mã giảm giá nguyên văn + chỉ dẫn link) hiện suốt video.
+- **Màn hình kết (end-card)** — màn đóng 1–6s hiện sản phẩm / giá / mã / chỉ dẫn link.
+- **Campaign** — một nguồn duy nhất cho link / mã / giá / shop, dùng lại cho mọi nơi.
+
+**📣 Copy & tăng tiếp cận**
+- **Câu kêu Lưu / Chia sẻ** — tận dụng việc lưu & chia sẻ được thuật toán ưu tiên hơn lượt thích.
+- **Caption & hashtag**, **trả lời bình luận**, **comment ghim**, **dòng công bố (disclosure)** minh bạch.
+- **Gợi ý nhạc trending**, **sticker chữ & CTA**, **chữ cho ảnh bìa/thumbnail**, **khung giờ đăng**.
+
+**📦 Xuất bản**
+- **Export Copy** — gom toàn bộ nội dung đã tạo (kịch bản, hook, campaign, caption, lịch đăng…) thành một file `.txt` để dùng lại.
+
+> Giao diện được tổ chức thành 3 bước: ① Sản phẩm & Kịch bản → ② Copy & Tài sản → ③ Video & Phụ đề. Hỗ trợ đa ngôn ngữ (Việt / English / Русский).
 
 ## Video demo 📺
 
