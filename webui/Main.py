@@ -30,6 +30,7 @@ from app.services.affiliate import build_affiliate_package_text, format_schedule
 from app.services.campaign import (
     CAMPAIGN_FIELDS,
     format_campaign_cta,
+    format_end_card_text,
     format_onscreen_cta,
     has_campaign,
 )
@@ -356,6 +357,15 @@ def _fill_onscreen_cta():
     fields. Done in a callback so we may write the widget's session_state key
     without the post-instantiation exception Streamlit raises otherwise."""
     st.session_state["onscreen_cta_text"] = format_onscreen_cta(
+        _campaign_values(), _campaign_label
+    )
+
+
+def _fill_end_card():
+    """on_click callback: (re)derive the end-card text from the current campaign
+    fields, mirroring _fill_onscreen_cta (callback avoids the post-instantiation
+    exception Streamlit raises when writing a widget's key inline)."""
+    st.session_state["end_card_text"] = format_end_card_text(
         _campaign_values(), _campaign_label
     )
 
@@ -945,6 +955,31 @@ with step1:
             )
             params.cta_text = st.session_state.get("onscreen_cta_text", "")
             params.cta_position = cta_positions[pos_idx][1]
+
+        # Append a closing end-card outro (1-6s) after the video — product / price
+        # / code (verbatim) + link pointer on a solid screen. Plain text only.
+        add_end_card = st.checkbox(tr("Add End Card"), key="end_card_enabled")
+        if add_end_card:
+            st.caption(tr("End Card Hint"))
+            if "end_card_text" not in st.session_state:
+                st.session_state["end_card_text"] = format_end_card_text(
+                    campaign, _campaign_label
+                )
+            st.text_area(tr("End Card Text"), key="end_card_text", height=90)
+            st.button(
+                tr("Fill End Card From Campaign"),
+                on_click=_fill_end_card,
+                key="fill_end_card",
+            )
+            params.end_card_seconds = st.slider(
+                tr("End Card Duration (s)"),
+                min_value=1.0,
+                max_value=6.0,
+                value=3.0,
+                step=0.5,
+                key="end_card_seconds",
+            )
+            params.end_card_text = st.session_state.get("end_card_text", "")
 
     with st.container(border=True):
         st.write(tr("Video Script Settings"))

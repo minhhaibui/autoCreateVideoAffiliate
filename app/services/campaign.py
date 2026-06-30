@@ -70,6 +70,27 @@ def format_onscreen_cta(campaign, label) -> str:
     return "\n".join(lines)
 
 
+def format_end_card_text(campaign, label) -> str:
+    """A short, PLAIN-TEXT closing 'end card' to append after the video — no emoji,
+    same reason as the burned CTA: the bundled fonts have no emoji glyphs. Stacks
+    the product, price, discount code (verbatim) and a pointer to the pinned-comment
+    link, each on its own line, to be shown large and centered on a solid screen.
+    Returns '' when the campaign is empty. Used only as the editable default; the
+    user controls the exact end-card text."""
+    data = normalize_campaign(campaign)
+    if not has_campaign(data):
+        return ""
+    lines = []
+    if data["product"]:
+        lines.append(data["product"])
+    if data["price"]:
+        lines.append(data["price"])
+    if data["code"]:
+        lines.append(f"{label('campaign_code_label')}: {data['code']}")
+    lines.append(label("campaign_onscreen_pointer"))
+    return "\n".join(lines)
+
+
 def build_campaign_section(campaign, label) -> str:
     """A plain-text details block for the export bundle: every present field on
     its own labelled line. Returns '' when the campaign is empty."""

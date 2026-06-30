@@ -411,6 +411,37 @@ class TestVideoService(unittest.TestCase):
         finally:
             vd.close_clip(clip)
 
+    def test_create_end_card_clip_renders_full_screen_outro(self):
+        """The end card must build a real, full-screen, renderable clip that spans
+        the requested duration — a closing outro concatenated after the video."""
+        fonts = [
+            f
+            for f in os.listdir(utils.font_dir())
+            if f.lower().endswith((".ttf", ".ttc", ".otf"))
+        ]
+        if not fonts:
+            self.skipTest("no bundled font available")
+        font_path = os.path.join(utils.font_dir(), fonts[0])
+
+        clip = vd._create_end_card_clip(
+            text="Mini blender\n199k\nCode: SALE10\nLink in pinned comment",
+            video_width=1080,
+            video_height=1920,
+            font_path=font_path,
+            font_size=54,
+            duration=3.0,
+            bg_color="#101010",
+        )
+        try:
+            self.assertEqual(clip.duration, 3.0)
+            # full-screen, matching the video resolution
+            self.assertEqual(tuple(clip.size), (1080, 1920))
+            # renders an actual RGB frame without raising
+            frame = clip.get_frame(1.0)
+            self.assertEqual(frame.shape[2], 3)
+        finally:
+            vd.close_clip(clip)
+
     def test_combine_videos_closes_audio_clip_when_duration_read_fails(self):
         """
         `combine_videos()` 只需要读取旁白音频时长。即使读取 duration

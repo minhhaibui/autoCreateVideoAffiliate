@@ -3,6 +3,7 @@ import unittest
 from app.services.campaign import (
     build_campaign_section,
     format_campaign_cta,
+    format_end_card_text,
     format_onscreen_cta,
     has_campaign,
     normalize_campaign,
@@ -94,6 +95,37 @@ class TestFormatOnscreenCta(unittest.TestCase):
     def test_pointer_only_when_no_code(self):
         cta = format_onscreen_cta({"product": "Blender"}, _label)
         self.assertEqual(cta, "campaign_onscreen_pointer")
+
+
+class TestFormatEndCardText(unittest.TestCase):
+    def test_empty_returns_blank(self):
+        self.assertEqual(format_end_card_text(None, _label), "")
+        self.assertEqual(format_end_card_text({}, _label), "")
+
+    def test_has_no_emoji(self):
+        text = format_end_card_text(FULL, _label)
+        for emoji in ("🛒", "🎁", "👉", "🏪", "👇"):
+            self.assertNotIn(emoji, text)
+
+    def test_stacks_product_price_code_and_pointer(self):
+        text = format_end_card_text(FULL, _label)
+        self.assertEqual(
+            text.splitlines(),
+            [
+                "Mini portable blender",
+                "199k",
+                "campaign_code_label: SALE10",
+                "campaign_onscreen_pointer",
+            ],
+        )
+
+    def test_code_is_verbatim(self):
+        text = format_end_card_text({"code": "Save-20%!"}, _label)
+        self.assertIn("Save-20%!", text)
+
+    def test_pointer_only_when_no_fields_but_one_present(self):
+        text = format_end_card_text({"product": "Blender"}, _label)
+        self.assertEqual(text.splitlines(), ["Blender", "campaign_onscreen_pointer"])
 
 
 class TestBuildCampaignSection(unittest.TestCase):

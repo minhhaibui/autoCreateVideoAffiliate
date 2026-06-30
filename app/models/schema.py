@@ -111,6 +111,14 @@ class VideoParams(BaseModel):
     cta_text: str = Field(default="", max_length=120)
     cta_position: Optional[str] = "top"  # top, bottom, center
 
+    # Closing "end card" appended after the video — a short branded outro (1-6s)
+    # showing the product / price / code (verbatim) + a link pointer on a solid
+    # screen. Plain text only (the bundled fonts have no emoji glyphs). Empty text
+    # or non-positive duration = off. See app.services.campaign.format_end_card_text.
+    end_card_text: str = Field(default="", max_length=200)
+    end_card_seconds: float = 3.0
+    end_card_bg_color: str = "#000000"
+
     n_threads: Optional[int] = 2
     paragraph_number: int = Field(default=1, ge=1, le=10)
     video_script_prompt: str = Field(default="", max_length=2000)

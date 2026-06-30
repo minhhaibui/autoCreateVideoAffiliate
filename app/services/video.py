@@ -20,6 +20,7 @@ from moviepy import (
     TextClip,
     VideoFileClip,
     afx,
+    concatenate_videoclips,
 )
 from moviepy.video.tools.subtitles import SubtitlesClip
 from PIL import Image, ImageDraw, ImageFont
@@ -860,6 +861,49 @@ def _create_cta_clip(
     return cta_clip.with_position(("center", y))
 
 
+def _create_end_card_clip(
+    text: str,
+    video_width: int,
+    video_height: int,
+    font_path: str,
+    font_size: int,
+    duration: float,
+    bg_color: str = "#000000",
+):
+    """Build a full-screen closing 'end card': centered plain-text lines (product /
+    price / code / link pointer) on a solid background, shown for ``duration``
+    seconds. Plain text only — the bundled fonts have no emoji glyphs. Concatenated
+    after the main video as a branded outro (see app.services.campaign)."""
+    max_width = int(video_width * 0.86)
+    wrapped_txt, txt_height = wrap_text(
+        text, max_width=max_width, font=font_path, fontsize=font_size
+    )
+    interline = int(font_size * 0.4)
+    line_count = wrapped_txt.count("\n") + 1
+    clip_h = int(txt_height + interline * line_count)
+
+    background = ColorClip(
+        size=(video_width, video_height), color=_hex_to_rgb(bg_color)
+    ).with_duration(duration)
+    text_clip = TextClip(
+        text=wrapped_txt,
+        font=font_path,
+        font_size=font_size,
+        color="#FFFFFF",
+        bg_color=None,
+        stroke_color="#000000",
+        stroke_width=max(1, int(font_size * 0.03)),
+        interline=interline,
+        size=(max_width, clip_h),
+        text_align="center",
+    ).with_duration(duration)
+    end_card = CompositeVideoClip(
+        [background, text_clip.with_position("center")],
+        size=(video_width, video_height),
+    ).with_duration(duration)
+    return end_card
+
+
 def generate_video(
     video_path: str,
     audio_path: str,
@@ -1045,6 +1089,33 @@ def generate_video(
             logger.info(f"  ⑥ on-screen CTA: {cta_text!r}")
         except Exception as e:
             logger.error(f"failed to add on-screen CTA: {str(e)}")
+
+    # Append a closing "end card" outro after the video (product / price / code +
+    # link pointer on a solid screen). Wrapped so a failure can never abort an
+    # otherwise-good render. Built before BGM so the BGM loop covers it too, and
+    # before with_audio so the narration simply runs silent under the end card.
+    end_card_text = (getattr(params, "end_card_text", "") or "").strip()
+    end_card_seconds = float(getattr(params, "end_card_seconds", 0) or 0)
+    if end_card_text and end_card_seconds > 0:
+        try:
+            ec_font = font_path or os.path.join(
+                utils.font_dir(), params.font_name or "STHeitiMedium.ttc"
+            )
+            if os.name == "nt":
+                ec_font = ec_font.replace("\\", "/")
+            end_card_clip = _create_end_card_clip(
+                text=end_card_text,
+                video_width=video_width,
+                video_height=video_height,
+                font_path=ec_font,
+                font_size=max(28, int(int(params.font_size) * 0.9)),
+                duration=min(10.0, max(1.0, end_card_seconds)),
+                bg_color=getattr(params, "end_card_bg_color", "#000000") or "#000000",
+            )
+            video_clip = concatenate_videoclips([video_clip, end_card_clip])
+            logger.info(f"  ⑦ end card: {end_card_text!r} ({end_card_seconds}s)")
+        except Exception as e:
+            logger.error(f"failed to add end card: {str(e)}")
 
     bgm_file = get_bgm_file(bgm_type=params.bgm_type, bgm_file=params.bgm_file)
     if bgm_file:
