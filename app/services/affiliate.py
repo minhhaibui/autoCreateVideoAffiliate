@@ -30,6 +30,7 @@ def build_affiliate_package_text(
     schedule_slots=None,
     pinned_comments=None,
     disclosure_lines=None,
+    save_share_prompts=None,
     campaign=None,
 ):
     """Assemble all generated affiliate assets into one plain-text document the
@@ -153,5 +154,18 @@ def build_affiliate_package_text(
                 parts.append(f"   {label('disclosure_note')}: {item['note']}")
             blocks.append("\n".join(parts))
         section(label("disclosure"), "\n".join(blocks))
+
+    if save_share_prompts:
+        blocks = []
+        for i, item in enumerate(save_share_prompts):
+            parts = [f"{i + 1}. {item.get('line', '')}".rstrip()]
+            if item.get("signal"):
+                parts.append(f"   {label('save_share_signal')}: {item['signal']}")
+            if item.get("placement"):
+                parts.append(f"   {label('save_share_placement')}: {item['placement']}")
+            if item.get("why"):
+                parts.append(f"   {label('save_share_why')}: {item['why']}")
+            blocks.append("\n".join(parts))
+        section(label("save_share"), "\n".join(blocks))
 
     return "\n".join(lines).strip() + "\n"

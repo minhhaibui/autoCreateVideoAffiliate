@@ -1468,6 +1468,75 @@ class TestDisclosureLines(unittest.TestCase):
             self.assertEqual(llm.generate_disclosure_lines(video_subject="x"), [])
 
 
+class TestSaveSharePrompts(unittest.TestCase):
+    """Save / Share reach-lever prompt generation."""
+
+    def test_generate_save_share_prompts_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "line": "Save this so you don't lose the link",
+                    "signal": "Save",
+                    "placement": "On-screen sticker",
+                    "why": "viewers come back to buy",
+                },
+                {
+                    "line": "Send this to a friend who keeps buying the wrong one",
+                    "signal": "Share",
+                    "placement": "Spoken outro",
+                    "why": "shares expand reach",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            prompts = llm.generate_save_share_prompts(
+                video_subject="mini blender",
+                language="English",
+            )
+
+        self.assertEqual(len(prompts), 2)
+        self.assertEqual(prompts[0]["signal"], "Save")
+        for item in prompts:
+            self.assertEqual(set(item.keys()), set(llm.SAVE_BAIT_KEYS))
+
+    def test_generate_save_share_prompts_drops_items_without_line(self):
+        payload = json.dumps(
+            [
+                {"signal": "Save", "placement": "Caption"},
+                "not a dict",
+                {"line": "Save this for later", "signal": "Save"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            prompts = llm.generate_save_share_prompts(video_subject="x")
+
+        self.assertEqual(len(prompts), 1)
+        self.assertEqual(prompts[0]["line"], "Save this for later")
+
+    def test_generate_save_share_prompts_recovers_embedded_json(self):
+        payload = 'Sure: [{"line": "Save this 👇"}] done'
+        with patch.object(llm, "_generate_response", return_value=payload):
+            prompts = llm.generate_save_share_prompts(video_subject="x")
+
+        self.assertEqual(len(prompts), 1)
+        self.assertEqual(prompts[0]["line"], "Save this 👇")
+
+    def test_generate_save_share_prompts_clamps_amount(self):
+        self.assertEqual(
+            llm._clamp_count(999, llm.DEFAULT_SAVE_BAIT_COUNT, llm.MAX_SAVE_BAIT_COUNT),
+            llm.MAX_SAVE_BAIT_COUNT,
+        )
+        self.assertEqual(
+            llm._clamp_count(0, llm.DEFAULT_SAVE_BAIT_COUNT, llm.MAX_SAVE_BAIT_COUNT), 1
+        )
+
+    def test_generate_save_share_prompts_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(llm.generate_save_share_prompts(video_subject="x"), [])
+
+
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
 FOUNDRY_BASE = "https://amanrai-test-resource.services.ai.azure.com/anthropic"
 FOUNDRY_MODEL = "azure_ai/claude-sonnet-4-6"

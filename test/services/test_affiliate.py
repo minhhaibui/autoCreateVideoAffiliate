@@ -170,6 +170,28 @@ class TestBuildAffiliatePackageText(unittest.TestCase):
         self.assertNotIn("disclosure_placement:", out)
         self.assertNotIn("disclosure_note:", out)
 
+    def test_save_share_prompts(self):
+        prompts = [
+            {
+                "line": "Save this so you don't lose the link",
+                "signal": "Save",
+                "placement": "On-screen sticker",
+                "why": "viewers come back to buy",
+            }
+        ]
+        out = _build(save_share_prompts=prompts)
+        self.assertIn("1. Save this so you don't lose the link", out)
+        self.assertIn("save_share_signal: Save", out)
+        self.assertIn("save_share_placement: On-screen sticker", out)
+        self.assertIn("save_share_why: viewers come back to buy", out)
+
+    def test_save_share_prompts_omit_missing_subfields(self):
+        out = _build(save_share_prompts=[{"line": "Save this for later"}])
+        self.assertIn("1. Save this for later", out)
+        self.assertNotIn("save_share_signal:", out)
+        self.assertNotIn("save_share_placement:", out)
+        self.assertNotIn("save_share_why:", out)
+
     def test_label_callable_translates_headings(self):
         out = build_affiliate_package_text(
             subject="X",

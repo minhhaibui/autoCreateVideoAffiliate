@@ -1510,6 +1510,53 @@ with step2:
             elif "disclosure_lines" in st.session_state:
                 st.info(tr("No Disclosure"))
 
+        # Save / Share prompts. In 2026 the algorithm weights saves & shares above
+        # likes (intent to return / redistribute), so an explicit, honest "save
+        # this / send this to…" line is a cheap reach lever.
+        with st.container(border=True):
+            st.write(tr("Save Share Prompts"))
+            st.caption(tr("Save Share Hint"))
+            save_share_amount = st.slider(
+                tr("Number of Save Prompts"),
+                min_value=1,
+                max_value=llm.MAX_SAVE_BAIT_COUNT,
+                value=llm.DEFAULT_SAVE_BAIT_COUNT,
+                key="save_share_amount",
+            )
+            if st.button(tr("Generate Save Prompts"), key="auto_generate_save_share"):
+                if not params.video_subject:
+                    st.error(tr("Please Enter the Video Subject"))
+                else:
+                    with st.spinner(tr("Generating Save Prompts")):
+                        st.session_state["save_share_prompts"] = llm.generate_save_share_prompts(
+                            video_subject=params.video_subject,
+                            language=(
+                                params.video_language
+                                or st.session_state.get("ui_language", "")
+                            ),
+                            amount=save_share_amount,
+                        )
+
+            save_share_prompts = st.session_state.get("save_share_prompts") or []
+            if save_share_prompts:
+                for i, item in enumerate(save_share_prompts):
+                    with st.expander(
+                        f"🔖 {item.get('signal', '') or tr('Save Share Prompts')}: "
+                        f"{item.get('line', '')}",
+                        expanded=(i == 0),
+                    ):
+                        render_detail_fields(
+                            item,
+                            [
+                                ("signal", "Save Share Signal"),
+                                ("placement", "Save Share Placement"),
+                                ("why", "Save Share Why"),
+                            ],
+                        )
+                st.caption(tr("Save Share Use Hint"))
+            elif "save_share_prompts" in st.session_state:
+                st.info(tr("No Save Prompts"))
+
     with toolkit_tabs[2]:
         # Trending-sound helper. Music choice strongly affects a TikTok's reach, but
         # creators often don't know what to put on. This suggests sound STYLES plus a
@@ -1686,6 +1733,10 @@ with step2:
                 "disclosure": tr("Affiliate Disclosure"),
                 "disclosure_placement": tr("Disclosure Placement"),
                 "disclosure_note": tr("Disclosure Note"),
+                "save_share": tr("Save Share Prompts"),
+                "save_share_signal": tr("Save Share Signal"),
+                "save_share_placement": tr("Save Share Placement"),
+                "save_share_why": tr("Save Share Why"),
             }
             # Source the script, keywords and hooks from the live widgets the user
             # actually edits (the unkeyed script/keywords boxes are read back via
@@ -1709,6 +1760,7 @@ with step2:
                 schedule_slots=st.session_state.get("schedule_slots") or [],
                 pinned_comments=st.session_state.get("pinned_comments") or [],
                 disclosure_lines=st.session_state.get("disclosure_lines") or [],
+                save_share_prompts=st.session_state.get("save_share_prompts") or [],
                 campaign=_campaign_values(),
                 label=lambda key: _section_labels.get(key, _campaign_label(key)),
             )

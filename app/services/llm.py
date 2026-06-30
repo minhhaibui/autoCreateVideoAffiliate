@@ -1957,6 +1957,81 @@ Write {amount} ready-to-use affiliate / paid-partnership DISCLOSURE options for 
     return lines[:amount]
 
 
+DEFAULT_SAVE_BAIT_COUNT = 4
+MAX_SAVE_BAIT_COUNT = 8
+MAX_SAVE_BAIT_FIELD_LENGTH = 300
+
+SAVE_BAIT_KEYS = ("line", "signal", "placement", "why")
+
+
+def generate_save_share_prompts(
+    video_subject: str,
+    language: str = "",
+    amount: int = DEFAULT_SAVE_BAIT_COUNT,
+) -> List[dict]:
+    """Write short calls that nudge viewers to SAVE or SHARE a short video about
+    ``video_subject``. In 2026 the algorithm weights saves and shares above likes
+    (they signal intent to return / redistribute), so an explicit, natural "save
+    this / send this to…" line is a cheap reach lever. These are honest prompts —
+    a real reason to save or send, never fake urgency.
+
+    Returns a list of dicts with the keys in SAVE_BAIT_KEYS (line, signal,
+    placement, why). ``line`` is the spoken/on-screen prompt, ``signal`` is which
+    it drives (Save or Share), ``placement`` where to use it, and ``why`` a short
+    reason it earns the save/share. On repeated failure an empty list is returned
+    so the caller can show a friendly message rather than crash.
+    """
+    amount = _clamp_count(amount, DEFAULT_SAVE_BAIT_COUNT, MAX_SAVE_BAIT_COUNT)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "line", "signal", "placement" and "why" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the subject."
+    )
+
+    prompt = f"""
+# Role: Short-Video Save & Share Prompt Writer
+
+## Goals:
+Write {amount} short calls that make a viewer want to SAVE or SHARE a short affiliate video about "{video_subject}". Saves and shares are the strongest reach signals (a save = "I'll come back to this", a share = "someone else needs this"), so each call must give a genuine reason to save or send.
+
+## Important:
+1. each "line" is one short, natural sentence the creator can say out loud or put on screen (e.g. "Save this so you don't lose the link", "Send this to a friend who keeps buying the wrong one").
+2. tie the save/share to a real reason rooted in "{video_subject}" — a checklist to come back to, a deal to not lose, a person who has this exact problem. NO fake urgency, fake scarcity, or "share or bad luck" tricks.
+3. mix both signals: some lines drive SAVE, some drive SHARE.
+4. keep each line under ~12 words so it fits an on-screen sticker and is easy to say.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "line", "signal", "placement", "why".
+   - "line": the save/share prompt text.
+   - "signal": either "Save" or "Share" — which action this line drives.
+   - "placement": where to use it (e.g. On-screen sticker, Spoken outro, Caption, Pinned comment).
+   - "why": one short reason it earns the save or share.
+3. {language_line}
+4. make the {amount} lines clearly different in wording, signal and placement.
+
+## Output Example:
+[{{"line": "...", "signal": "Save", "placement": "...", "why": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating save/share prompts: subject={video_subject!r}, amount={amount}, "
+        f"language={language!r}"
+    )
+
+    prompts = _generate_json_object_list(
+        prompt,
+        lambda x: _coerce_keyed_dict(x, SAVE_BAIT_KEYS, ("line",), MAX_SAVE_BAIT_FIELD_LENGTH),
+        "save/share prompts",
+    )
+    return prompts[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(
