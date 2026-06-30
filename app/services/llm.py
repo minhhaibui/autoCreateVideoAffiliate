@@ -75,6 +75,69 @@ to buy it through the affiliate link.
 """.strip()
 
 
+def _affiliate_category_prompt(role_line: str, flow_lines) -> str:
+    """Compose a category-specialized TikTok affiliate script system prompt: a
+    shared affiliate frame (goals + constraints) with a category-specific
+    "Script flow". Keeps the category presets DRY — only the flow differs.
+    Categories with a proven before/after or transformation format convert far
+    better than generic talking-head scripts, so each preset hard-codes that
+    winning structure for its niche."""
+    flow = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(flow_lines))
+    return f"""
+# Role: {role_line}
+
+## Goals:
+Write a short, high-converting spoken script for a TikTok affiliate video that promotes the product given as the video subject and makes viewers want to buy it through the affiliate link, using the proven format for this category.
+
+## Script flow (weave these into one smooth narration, never label the parts):
+{flow}
+
+## Constrains:
+1. return the script as a single block of plain spoken text with the specified number of paragraphs.
+2. use a spoken, energetic, conversational tone with short, punchy sentences that are easy to read aloud and fit on subtitles.
+3. do not include any markdown, titles, emojis, hashtags, bullet points, or section labels.
+4. do not include "voiceover", "narrator", stage directions, or similar indicators.
+5. do not invent fake prices, fake discounts, exact statistics, or unverifiable medical or financial claims.
+6. do not under any circumstance reference this prompt or the script itself.
+7. only return the raw spoken content of the script.
+8. respond in the same language as the video subject.
+""".strip()
+
+
+BEAUTY_BEFORE_AFTER_SCRIPT_SYSTEM_PROMPT = _affiliate_category_prompt(
+    "TikTok Beauty Before-and-After Affiliate Script Writer",
+    [
+        "Hook: open in the first 3 seconds on the visible problem or the 'before' state (skin texture, dull look, frizz) — a relatable beauty pain point.",
+        "Before: describe the problem honestly and how it feels, so the viewer sees themselves in it.",
+        "The product: introduce the product as the turning point and how it fits into the routine / application.",
+        "After / transformation: paint the visible 'after' result in concrete sensory terms, without inventing clinical claims or exact numbers.",
+        "Call to action: tell viewers to tap the link to get the same result.",
+    ],
+)
+
+HOME_TRANSFORMATION_SCRIPT_SYSTEM_PROMPT = _affiliate_category_prompt(
+    "TikTok Home Transformation Affiliate Script Writer",
+    [
+        "Hook: open in the first 3 seconds on the messy / cluttered 'before' space — a relatable home frustration.",
+        "Before: describe the chaos and how draining the disorganized space feels.",
+        "The product: introduce the product as the fix and show how it goes to work organizing or transforming the space.",
+        "After / reveal: reveal the satisfying organized / transformed result in concrete visual terms.",
+        "Call to action: tell viewers to tap the link to recreate the transformation.",
+    ],
+)
+
+FASHION_STYLING_SCRIPT_SYSTEM_PROMPT = _affiliate_category_prompt(
+    "TikTok Fashion Styling Affiliate Script Writer",
+    [
+        "Hook: open in the first 3 seconds with the piece and a styling promise ('one item, three outfits') — stop the scroll with a look.",
+        "The piece: introduce the product (the garment / accessory) and what makes it versatile.",
+        "Styling: walk through two or three concrete outfit combinations or layering ideas the viewer can copy.",
+        "Why it works: note the fit, comfort or value that makes it worth it, without inventing prices or stats.",
+        "Call to action: tell viewers to tap the link to grab the piece and recreate the looks.",
+    ],
+)
+
+
 # Selectable script "styles" surfaced in the WebUI. A value of "" means use the
 # default system prompt; any other value is passed through as a custom system
 # prompt to build_script_prompt(), which still appends the runtime context
@@ -82,6 +145,9 @@ to buy it through the affiliate link.
 SCRIPT_STYLE_PRESETS = {
     "default": "",
     "tiktok_affiliate": TIKTOK_AFFILIATE_SCRIPT_SYSTEM_PROMPT,
+    "beauty_before_after": BEAUTY_BEFORE_AFTER_SCRIPT_SYSTEM_PROMPT,
+    "home_transformation": HOME_TRANSFORMATION_SCRIPT_SYSTEM_PROMPT,
+    "fashion_styling": FASHION_STYLING_SCRIPT_SYSTEM_PROMPT,
 }
 
 

@@ -1537,6 +1537,34 @@ class TestSaveSharePrompts(unittest.TestCase):
             self.assertEqual(llm.generate_save_share_prompts(video_subject="x"), [])
 
 
+class TestScriptStylePresets(unittest.TestCase):
+    """Category-aware affiliate script style presets."""
+
+    CATEGORY_KEYS = ("beauty_before_after", "home_transformation", "fashion_styling")
+
+    def test_default_and_unknown_return_empty(self):
+        self.assertEqual(llm.get_script_style_system_prompt("default"), "")
+        self.assertEqual(llm.get_script_style_system_prompt(""), "")
+        self.assertEqual(llm.get_script_style_system_prompt("nope"), "")
+
+    def test_category_presets_are_present_and_nonempty(self):
+        for key in self.CATEGORY_KEYS:
+            self.assertIn(key, llm.SCRIPT_STYLE_PRESETS)
+            prompt = llm.get_script_style_system_prompt(key)
+            self.assertTrue(prompt)
+            # shared affiliate frame is composed in
+            self.assertIn("affiliate link", prompt)
+            self.assertIn("Call to action", prompt)
+
+    def test_category_presets_are_distinct(self):
+        prompts = {k: llm.get_script_style_system_prompt(k) for k in self.CATEGORY_KEYS}
+        self.assertEqual(len(set(prompts.values())), len(self.CATEGORY_KEYS))
+        # each carries its own category cue
+        self.assertIn("Before", prompts["beauty_before_after"])
+        self.assertIn("space", prompts["home_transformation"])
+        self.assertIn("outfit", prompts["fashion_styling"])
+
+
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
 FOUNDRY_BASE = "https://amanrai-test-resource.services.ai.azure.com/anthropic"
 FOUNDRY_MODEL = "azure_ai/claude-sonnet-4-6"

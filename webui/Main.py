@@ -1045,6 +1045,9 @@ with step1:
         script_styles = [
             (tr("Script Style Standard"), "default"),
             (tr("Script Style TikTok Affiliate"), "tiktok_affiliate"),
+            (tr("Script Style Beauty Before After"), "beauty_before_after"),
+            (tr("Script Style Home Transformation"), "home_transformation"),
+            (tr("Script Style Fashion Styling"), "fashion_styling"),
         ]
         saved_script_style = config.ui.get("script_style", "default")
         script_style_index = 0
