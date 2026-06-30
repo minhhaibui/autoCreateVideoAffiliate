@@ -411,6 +411,39 @@ class TestVideoService(unittest.TestCase):
         finally:
             vd.close_clip(clip)
 
+    def test_create_cta_clip_centers_short_opening_hook(self):
+        """The opening-hook overlay reuses _create_cta_clip: a short, centered,
+        renderable clip that starts at t=0 (so it sits over the video's opening)."""
+        fonts = [
+            f
+            for f in os.listdir(utils.font_dir())
+            if f.lower().endswith((".ttf", ".ttc", ".otf"))
+        ]
+        if not fonts:
+            self.skipTest("no bundled font available")
+        font_path = os.path.join(utils.font_dir(), fonts[0])
+
+        clip = vd._create_cta_clip(
+            text="POV: you found the gadget everyone needs",
+            video_width=1080,
+            video_height=1920,
+            font_path=font_path,
+            font_size=64,
+            position="center",
+            duration=3.0,
+        )
+        try:
+            self.assertEqual(clip.start, 0)
+            self.assertEqual(clip.duration, 3.0)
+            frame = clip.get_frame(1.0)
+            self.assertEqual(frame.shape[2], 3)
+            # center position → y roughly mid-frame
+            _, y = clip.pos(0)
+            self.assertGreater(y, 1920 * 0.2)
+            self.assertLess(y, 1920 * 0.8)
+        finally:
+            vd.close_clip(clip)
+
     def test_create_end_card_clip_renders_full_screen_outro(self):
         """The end card must build a real, full-screen, renderable clip that spans
         the requested duration — a closing outro concatenated after the video."""

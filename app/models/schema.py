@@ -111,6 +111,14 @@ class VideoParams(BaseModel):
     cta_text: str = Field(default="", max_length=120)
     cta_position: Optional[str] = "top"  # top, bottom, center
 
+    # Big opening "hook" text burned over the FIRST few seconds only. The 2026
+    # short-form algorithm rewards a multimodal hook (visual + on-screen text +
+    # voice) that clears the ~5s "qualified view" bar. Empty text or non-positive
+    # duration = off. Plain text only (the bundled fonts have no emoji glyphs).
+    hook_text: str = Field(default="", max_length=120)
+    hook_seconds: float = 3.0
+    hook_position: Optional[str] = "center"  # top, bottom, center
+
     # Closing "end card" appended after the video — a short branded outro (1-6s)
     # showing the product / price / code (verbatim) + a link pointer on a solid
     # screen. Plain text only (the bundled fonts have no emoji glyphs). Empty text

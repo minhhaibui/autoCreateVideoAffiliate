@@ -1066,6 +1066,34 @@ def generate_video(
             text_clips.append(clip)
         video_clip = CompositeVideoClip([video_clip, *text_clips])
 
+    # Burn a big opening hook over the FIRST few seconds only. The 2026 short-form
+    # algorithm rewards a multimodal hook (visual + on-screen text + voice) that
+    # clears the ~5s "qualified view" bar, so reinforce the spoken hook with bold
+    # on-screen text. Time-boxed (reuses the CTA overlay, which starts at t=0) and
+    # wrapped so a hook failure can never abort an otherwise-good render.
+    hook_text = (getattr(params, "hook_text", "") or "").strip()
+    hook_seconds = float(getattr(params, "hook_seconds", 0) or 0)
+    if hook_text and hook_seconds > 0:
+        try:
+            hook_font = font_path or os.path.join(
+                utils.font_dir(), params.font_name or "STHeitiMedium.ttc"
+            )
+            if os.name == "nt":
+                hook_font = hook_font.replace("\\", "/")
+            hook_clip = _create_cta_clip(
+                text=hook_text,
+                video_width=video_width,
+                video_height=video_height,
+                font_path=hook_font,
+                font_size=max(32, int(int(params.font_size) * 1.1)),
+                position=getattr(params, "hook_position", "center") or "center",
+                duration=min(10.0, max(1.0, hook_seconds)),
+            )
+            video_clip = CompositeVideoClip([video_clip, hook_clip])
+            logger.info(f"  ✦ opening hook: {hook_text!r} ({hook_seconds}s)")
+        except Exception as e:
+            logger.error(f"failed to add opening hook: {str(e)}")
+
     # Burn a persistent affiliate CTA over the whole video. Wrapped so a CTA
     # failure can never abort an otherwise-good render.
     cta_text = (getattr(params, "cta_text", "") or "").strip()

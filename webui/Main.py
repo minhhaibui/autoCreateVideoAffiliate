@@ -981,6 +981,39 @@ with step1:
             )
             params.end_card_text = st.session_state.get("end_card_text", "")
 
+        # Burn a big opening hook over the first few seconds — the 2026 algorithm
+        # rewards a multimodal hook (visual + on-screen text + voice) to clear the
+        # ~5s "qualified view" bar. Plain text only; use your strongest hook line.
+        add_hook = st.checkbox(tr("Burn Opening Hook"), key="hook_enabled")
+        if add_hook:
+            st.caption(tr("Opening Hook Hint"))
+            params.hook_text = st.text_area(
+                tr("Opening Hook Text"), key="hook_text_input", height=70
+            ).strip()
+            hcol1, hcol2 = st.columns(2)
+            with hcol1:
+                params.hook_seconds = st.slider(
+                    tr("Opening Hook Duration (s)"),
+                    min_value=1.0,
+                    max_value=6.0,
+                    value=3.0,
+                    step=0.5,
+                    key="hook_seconds",
+                )
+            with hcol2:
+                hook_positions = [
+                    (tr("CTA Position Center"), "center"),
+                    (tr("CTA Position Top"), "top"),
+                    (tr("CTA Position Bottom"), "bottom"),
+                ]
+                hpos_idx = st.selectbox(
+                    tr("Opening Hook Position"),
+                    range(len(hook_positions)),
+                    format_func=lambda i: hook_positions[i][0],
+                    key="hook_position_idx",
+                )
+                params.hook_position = hook_positions[hpos_idx][1]
+
     with st.container(border=True):
         st.write(tr("Video Script Settings"))
         params.video_subject = st.text_input(
