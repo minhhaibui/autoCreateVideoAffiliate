@@ -36,6 +36,7 @@ from app.services.campaign import (
 )
 from app.services.fonts import get_recommended_font
 from app.services.preflight import is_llm_ready
+from app.services.onboarding import example_prefill, should_show_onboarding
 from app.utils import utils
 
 st.set_page_config(
@@ -369,6 +370,17 @@ def _fill_end_card():
     st.session_state["end_card_text"] = format_end_card_text(
         _campaign_values(), _campaign_label
     )
+
+
+def _load_example():
+    """on_click callback: prefill the subject and campaign with a demo product so
+    a first-run user sees a fully-populated flow. Set in a callback so the values
+    land before the keyed widgets re-instantiate on the next rerun."""
+    prefill = example_prefill(
+        tr("Example Subject"), tr("Example Product"), tr("Example Shop")
+    )
+    for key, value in prefill.items():
+        st.session_state[key] = value
 
 
 def _use_script_variant(index):
@@ -855,6 +867,18 @@ _preflight_key = config.app.get(f"{_preflight_provider}_api_key", "")
 if not is_llm_ready(_preflight_provider, _preflight_key):
     st.warning(tr("LLM Key Missing Banner"))
 
+# First-run onboarding. A blank canvas of ~12 panels is intimidating for a
+# non-technical creator, so on an empty page show a short "how it works" strip
+# and a one-click "Load example" that fills a demo product + campaign. It is
+# self-dismissing once a subject or script exists.
+if should_show_onboarding(
+    st.session_state.get("video_subject"), st.session_state.get("video_script")
+):
+    with st.container(border=True):
+        st.markdown(tr("Onboarding Title"))
+        st.caption(tr("Onboarding Steps"))
+        st.button(tr("Load Example"), on_click=_load_example)
+
 step1, step2, step3 = st.tabs([
     tr("Step 1 Product Script"),
     tr("Step 2 Copy Assets"),
@@ -1207,7 +1231,7 @@ with step1:
             )
         if st.button(tr("Generate Video Keywords"), key="auto_generate_terms"):
             if not params.video_script:
-                st.error(tr("Please Enter the Video Subject"))
+                st.error(tr("Please Enter the Video Script"))
                 st.stop()
 
             with st.spinner(tr("Generating Video Keywords")):
