@@ -1378,287 +1378,307 @@ with step2:
         # llm.generate_social_metadata backend (already used by the REST API) so the
         # WebUI user can produce a ready-to-paste title, caption and hashtags for
         # affiliate posts without leaving the app.
-        with st.container(border=True):
-            st.write(tr("Social Post Caption"))
-            social_platforms = [
-                ("TikTok", "tiktok"),
-                ("YouTube Shorts", "youtube_shorts"),
-                ("Instagram Reels", "instagram_reels"),
-                ("Facebook Reels", "facebook_reels"),
-            ]
-            selected_social_index = st.selectbox(
-                tr("Publish Platform"),
-                index=0,
-                options=range(len(social_platforms)),
-                format_func=lambda x: social_platforms[x][0],
-                key="social_platform_select",
-            )
-            social_platform = social_platforms[selected_social_index][1]
-
-            if st.button(
-                tr("Generate Caption and Hashtags"), key="auto_generate_social"
-            ):
-                current_script = st.session_state.get("video_script", "")
-                if not params.video_subject and not current_script:
-                    st.error(tr("Please Enter the Video Subject"))
-                else:
-                    with st.spinner(tr("Generating Caption and Hashtags")):
-                        st.session_state["social_metadata"] = llm.generate_social_metadata(
-                            video_subject=params.video_subject,
-                            video_script=current_script,
-                            language=(params.video_language or llm.DEFAULT_SOCIAL_LANGUAGE),
-                            platform=social_platform,
-                        )
-
-            social_meta = st.session_state.get("social_metadata")
-            if social_meta:
-                # No widget keys here on purpose: value= is rebuilt from the latest
-                # generated metadata each rerun, so the fields always show the most
-                # recent result while staying selectable/copyable.
-                st.text_input(tr("Post Title"), value=social_meta.get("title", ""))
-                hashtags = " ".join(social_meta.get("hashtags", []) or [])
-                caption_body = social_meta.get("caption", "")
-                full_caption = (
-                    f"{caption_body}\n\n{hashtags}" if hashtags else caption_body
+        social_tools = [
+            "Social Post Caption",
+            "Comment Replies",
+            "Posting Schedule",
+            "Pinned Comment",
+            "Affiliate Disclosure",
+            "Save Share Prompts",
+        ]
+        social_view = st.selectbox(
+            tr("Choose a Copy Tool"),
+            options=social_tools,
+            format_func=lambda k: tr(k),
+            key="social_tool_view",
+        )
+        if social_view == "Social Post Caption":
+            with st.container(border=True):
+                st.write(tr("Social Post Caption"))
+                social_platforms = [
+                    ("TikTok", "tiktok"),
+                    ("YouTube Shorts", "youtube_shorts"),
+                    ("Instagram Reels", "instagram_reels"),
+                    ("Facebook Reels", "facebook_reels"),
+                ]
+                selected_social_index = st.selectbox(
+                    tr("Publish Platform"),
+                    index=0,
+                    options=range(len(social_platforms)),
+                    format_func=lambda x: social_platforms[x][0],
+                    key="social_platform_select",
                 )
-                st.text_area(tr("Caption"), value=full_caption, height=180)
-                st.caption(tr("Caption Copy Hint"))
+                social_platform = social_platforms[selected_social_index][1]
+
+                if st.button(
+                    tr("Generate Caption and Hashtags"), key="auto_generate_social"
+                ):
+                    current_script = st.session_state.get("video_script", "")
+                    if not params.video_subject and not current_script:
+                        st.error(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Caption and Hashtags")):
+                            st.session_state["social_metadata"] = llm.generate_social_metadata(
+                                video_subject=params.video_subject,
+                                video_script=current_script,
+                                language=(params.video_language or llm.DEFAULT_SOCIAL_LANGUAGE),
+                                platform=social_platform,
+                            )
+
+                social_meta = st.session_state.get("social_metadata")
+                if social_meta:
+                    # No widget keys here on purpose: value= is rebuilt from the latest
+                    # generated metadata each rerun, so the fields always show the most
+                    # recent result while staying selectable/copyable.
+                    st.text_input(tr("Post Title"), value=social_meta.get("title", ""))
+                    hashtags = " ".join(social_meta.get("hashtags", []) or [])
+                    caption_body = social_meta.get("caption", "")
+                    full_caption = (
+                        f"{caption_body}\n\n{hashtags}" if hashtags else caption_body
+                    )
+                    st.text_area(tr("Caption"), value=full_caption, height=180)
+                    st.caption(tr("Caption Copy Hint"))
 
         # Comment-reply helper. A lot of affiliate conversion happens in the comments
         # ("how much?", "where to buy?", "does it work?"). This drafts ready-to-paste
         # replies for the most likely comments so the creator can answer fast and
         # point viewers to the link. Reuses the existing LLM provider.
-        with st.container(border=True):
-            st.write(tr("Comment Replies"))
-            st.caption(tr("Comment Replies Hint"))
-            comment_reply_amount = st.slider(
-                tr("Number of Replies"),
-                min_value=3,
-                max_value=llm.MAX_COMMENT_REPLY_COUNT,
-                value=llm.DEFAULT_COMMENT_REPLY_COUNT,
-                key="comment_reply_amount",
-            )
-            if st.button(tr("Generate Comment Replies"), key="auto_generate_comment_replies"):
-                if not params.video_subject:
-                    st.error(tr("Please Enter the Video Subject"))
-                else:
-                    with st.spinner(tr("Generating Comment Replies")):
-                        st.session_state["comment_replies"] = llm.generate_comment_replies(
-                            video_subject=params.video_subject,
-                            language=(
-                                params.video_language
-                                or st.session_state.get("ui_language", "")
-                            ),
-                            amount=comment_reply_amount,
-                        )
+        if social_view == "Comment Replies":
+            with st.container(border=True):
+                st.write(tr("Comment Replies"))
+                st.caption(tr("Comment Replies Hint"))
+                comment_reply_amount = st.slider(
+                    tr("Number of Replies"),
+                    min_value=3,
+                    max_value=llm.MAX_COMMENT_REPLY_COUNT,
+                    value=llm.DEFAULT_COMMENT_REPLY_COUNT,
+                    key="comment_reply_amount",
+                )
+                if st.button(tr("Generate Comment Replies"), key="auto_generate_comment_replies"):
+                    if not params.video_subject:
+                        st.error(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Comment Replies")):
+                            st.session_state["comment_replies"] = llm.generate_comment_replies(
+                                video_subject=params.video_subject,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=comment_reply_amount,
+                            )
 
-            comment_replies = st.session_state.get("comment_replies") or []
-            if comment_replies:
-                for i, pair in enumerate(comment_replies):
-                    with st.expander(
-                        f"💬 {pair.get('comment', '')}",
-                        expanded=(i == 0),
-                    ):
-                        st.text_area(
-                            tr("Suggested Reply"),
-                            value=pair.get("reply", ""),
-                            key=f"comment_reply_{i}",
-                            height=80,
-                        )
-                st.caption(tr("Comment Replies Use Hint"))
-            elif "comment_replies" in st.session_state:
-                st.info(tr("No Comment Replies"))
+                comment_replies = st.session_state.get("comment_replies") or []
+                if comment_replies:
+                    for i, pair in enumerate(comment_replies):
+                        with st.expander(
+                            f"💬 {pair.get('comment', '')}",
+                            expanded=(i == 0),
+                        ):
+                            st.text_area(
+                                tr("Suggested Reply"),
+                                value=pair.get("reply", ""),
+                                key=f"comment_reply_{i}",
+                                height=80,
+                            )
+                    st.caption(tr("Comment Replies Use Hint"))
+                elif "comment_replies" in st.session_state:
+                    st.info(tr("No Comment Replies"))
 
-        with st.container(border=True):
-            st.write(tr("Posting Schedule"))
-            st.caption(tr("Posting Schedule Hint"))
-            schedule_region = st.text_input(
-                tr("Audience Region"),
-                key="schedule_region",
-                placeholder=tr("Audience Region Placeholder"),
-            )
-            schedule_amount = st.slider(
-                tr("Number of Slots"),
-                min_value=2,
-                max_value=llm.MAX_SCHEDULE_COUNT,
-                value=llm.DEFAULT_SCHEDULE_COUNT,
-                key="schedule_amount",
-            )
-            if st.button(tr("Suggest Posting Times"), key="auto_generate_schedule"):
-                if not params.video_subject:
-                    st.error(tr("Please Enter the Video Subject"))
-                else:
-                    with st.spinner(tr("Generating Posting Schedule")):
-                        st.session_state["schedule_slots"] = llm.generate_posting_schedule(
-                            video_subject=params.video_subject,
-                            language=(
-                                params.video_language
-                                or st.session_state.get("ui_language", "")
-                            ),
-                            audience_region=schedule_region,
-                            amount=schedule_amount,
-                        )
+        if social_view == "Posting Schedule":
+            with st.container(border=True):
+                st.write(tr("Posting Schedule"))
+                st.caption(tr("Posting Schedule Hint"))
+                schedule_region = st.text_input(
+                    tr("Audience Region"),
+                    key="schedule_region",
+                    placeholder=tr("Audience Region Placeholder"),
+                )
+                schedule_amount = st.slider(
+                    tr("Number of Slots"),
+                    min_value=2,
+                    max_value=llm.MAX_SCHEDULE_COUNT,
+                    value=llm.DEFAULT_SCHEDULE_COUNT,
+                    key="schedule_amount",
+                )
+                if st.button(tr("Suggest Posting Times"), key="auto_generate_schedule"):
+                    if not params.video_subject:
+                        st.error(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Posting Schedule")):
+                            st.session_state["schedule_slots"] = llm.generate_posting_schedule(
+                                video_subject=params.video_subject,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                audience_region=schedule_region,
+                                amount=schedule_amount,
+                            )
 
-            schedule_slots = st.session_state.get("schedule_slots") or []
-            if schedule_slots:
-                for i, slot in enumerate(schedule_slots):
-                    header = format_schedule_header(slot)
-                    with st.expander(f"🕒 {header}", expanded=(i == 0)):
-                        render_detail_fields(
-                            slot,
-                            [("day", "Schedule Day"), ("why", "Schedule Why")],
-                        )
-                st.caption(tr("Posting Schedule Use Hint"))
-            elif "schedule_slots" in st.session_state:
-                st.info(tr("No Posting Schedule"))
+                schedule_slots = st.session_state.get("schedule_slots") or []
+                if schedule_slots:
+                    for i, slot in enumerate(schedule_slots):
+                        header = format_schedule_header(slot)
+                        with st.expander(f"🕒 {header}", expanded=(i == 0)):
+                            render_detail_fields(
+                                slot,
+                                [("day", "Schedule Day"), ("why", "Schedule Why")],
+                            )
+                    st.caption(tr("Posting Schedule Use Hint"))
+                elif "schedule_slots" in st.session_state:
+                    st.info(tr("No Posting Schedule"))
 
         # Pinned first-comment helper. The creator's own pinned comment is prime
         # real estate for the affiliate link / CTA and for sparking the replies
         # that boost reach. Distinct from Comment Replies (which answers viewers).
-        with st.container(border=True):
-            st.write(tr("Pinned Comment"))
-            st.caption(tr("Pinned Comment Hint"))
-            pinned_amount = st.slider(
-                tr("Number of Pinned Comments"),
-                min_value=2,
-                max_value=llm.MAX_PINNED_COMMENT_COUNT,
-                value=llm.DEFAULT_PINNED_COMMENT_COUNT,
-                key="pinned_amount",
-            )
-            if st.button(tr("Generate Pinned Comment"), key="auto_generate_pinned"):
-                if not params.video_subject:
-                    st.error(tr("Please Enter the Video Subject"))
-                else:
-                    with st.spinner(tr("Generating Pinned Comment")):
-                        st.session_state["pinned_comments"] = llm.generate_pinned_comments(
-                            video_subject=params.video_subject,
-                            language=(
-                                params.video_language
-                                or st.session_state.get("ui_language", "")
-                            ),
-                            amount=pinned_amount,
-                        )
+        if social_view == "Pinned Comment":
+            with st.container(border=True):
+                st.write(tr("Pinned Comment"))
+                st.caption(tr("Pinned Comment Hint"))
+                pinned_amount = st.slider(
+                    tr("Number of Pinned Comments"),
+                    min_value=2,
+                    max_value=llm.MAX_PINNED_COMMENT_COUNT,
+                    value=llm.DEFAULT_PINNED_COMMENT_COUNT,
+                    key="pinned_amount",
+                )
+                if st.button(tr("Generate Pinned Comment"), key="auto_generate_pinned"):
+                    if not params.video_subject:
+                        st.error(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Pinned Comment")):
+                            st.session_state["pinned_comments"] = llm.generate_pinned_comments(
+                                video_subject=params.video_subject,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=pinned_amount,
+                            )
 
-            pinned_comments = st.session_state.get("pinned_comments") or []
-            if pinned_comments:
-                for i, pinned in enumerate(pinned_comments):
-                    with st.expander(
-                        f"📌 {pinned.get('comment', '')}",
-                        expanded=(i == 0),
-                    ):
-                        st.text_area(
-                            tr("Pinned Comment"),
-                            value=pinned.get("comment", ""),
-                            key=f"pinned_comment_{i}",
-                            height=80,
-                            label_visibility="collapsed",
-                        )
-                        render_detail_fields(
-                            pinned,
-                            [("cta", "Pinned CTA"), ("tip", "Pinned Tip")],
-                        )
-                st.caption(tr("Pinned Comment Use Hint"))
-            elif "pinned_comments" in st.session_state:
-                st.info(tr("No Pinned Comments"))
+                pinned_comments = st.session_state.get("pinned_comments") or []
+                if pinned_comments:
+                    for i, pinned in enumerate(pinned_comments):
+                        with st.expander(
+                            f"📌 {pinned.get('comment', '')}",
+                            expanded=(i == 0),
+                        ):
+                            st.text_area(
+                                tr("Pinned Comment"),
+                                value=pinned.get("comment", ""),
+                                key=f"pinned_comment_{i}",
+                                height=80,
+                                label_visibility="collapsed",
+                            )
+                            render_detail_fields(
+                                pinned,
+                                [("cta", "Pinned CTA"), ("tip", "Pinned Tip")],
+                            )
+                    st.caption(tr("Pinned Comment Use Hint"))
+                elif "pinned_comments" in st.session_state:
+                    st.info(tr("No Pinned Comments"))
 
         # Affiliate disclosure / compliance helper. Affiliate and paid content
         # must be disclosed clearly (FTC + platform policy); creators often skip
         # or bury it. Generate honest, ready-to-paste disclosure lines.
-        with st.container(border=True):
-            st.write(tr("Affiliate Disclosure"))
-            st.caption(tr("Affiliate Disclosure Hint"))
-            disclosure_amount = st.slider(
-                tr("Number of Disclosures"),
-                min_value=1,
-                max_value=llm.MAX_DISCLOSURE_COUNT,
-                value=llm.DEFAULT_DISCLOSURE_COUNT,
-                key="disclosure_amount",
-            )
-            if st.button(tr("Generate Disclosure"), key="auto_generate_disclosure"):
-                if not params.video_subject:
-                    st.error(tr("Please Enter the Video Subject"))
-                else:
-                    with st.spinner(tr("Generating Disclosure")):
-                        st.session_state["disclosure_lines"] = llm.generate_disclosure_lines(
-                            video_subject=params.video_subject,
-                            language=(
-                                params.video_language
-                                or st.session_state.get("ui_language", "")
-                            ),
-                            amount=disclosure_amount,
-                        )
+        if social_view == "Affiliate Disclosure":
+            with st.container(border=True):
+                st.write(tr("Affiliate Disclosure"))
+                st.caption(tr("Affiliate Disclosure Hint"))
+                disclosure_amount = st.slider(
+                    tr("Number of Disclosures"),
+                    min_value=1,
+                    max_value=llm.MAX_DISCLOSURE_COUNT,
+                    value=llm.DEFAULT_DISCLOSURE_COUNT,
+                    key="disclosure_amount",
+                )
+                if st.button(tr("Generate Disclosure"), key="auto_generate_disclosure"):
+                    if not params.video_subject:
+                        st.error(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Disclosure")):
+                            st.session_state["disclosure_lines"] = llm.generate_disclosure_lines(
+                                video_subject=params.video_subject,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=disclosure_amount,
+                            )
 
-            disclosure_lines = st.session_state.get("disclosure_lines") or []
-            if disclosure_lines:
-                for i, item in enumerate(disclosure_lines):
-                    with st.expander(
-                        f"⚖️ {item.get('placement', '') or tr('Affiliate Disclosure')}",
-                        expanded=(i == 0),
-                    ):
-                        st.text_area(
-                            tr("Affiliate Disclosure"),
-                            value=item.get("line", ""),
-                            key=f"disclosure_line_{i}",
-                            height=80,
-                            label_visibility="collapsed",
-                        )
-                        render_detail_fields(
-                            item,
-                            [
-                                ("placement", "Disclosure Placement"),
-                                ("note", "Disclosure Note"),
-                            ],
-                        )
-                st.caption(tr("Affiliate Disclosure Use Hint"))
-            elif "disclosure_lines" in st.session_state:
-                st.info(tr("No Disclosure"))
+                disclosure_lines = st.session_state.get("disclosure_lines") or []
+                if disclosure_lines:
+                    for i, item in enumerate(disclosure_lines):
+                        with st.expander(
+                            f"⚖️ {item.get('placement', '') or tr('Affiliate Disclosure')}",
+                            expanded=(i == 0),
+                        ):
+                            st.text_area(
+                                tr("Affiliate Disclosure"),
+                                value=item.get("line", ""),
+                                key=f"disclosure_line_{i}",
+                                height=80,
+                                label_visibility="collapsed",
+                            )
+                            render_detail_fields(
+                                item,
+                                [
+                                    ("placement", "Disclosure Placement"),
+                                    ("note", "Disclosure Note"),
+                                ],
+                            )
+                    st.caption(tr("Affiliate Disclosure Use Hint"))
+                elif "disclosure_lines" in st.session_state:
+                    st.info(tr("No Disclosure"))
 
         # Save / Share prompts. In 2026 the algorithm weights saves & shares above
         # likes (intent to return / redistribute), so an explicit, honest "save
         # this / send this to…" line is a cheap reach lever.
-        with st.container(border=True):
-            st.write(tr("Save Share Prompts"))
-            st.caption(tr("Save Share Hint"))
-            save_share_amount = st.slider(
-                tr("Number of Save Prompts"),
-                min_value=1,
-                max_value=llm.MAX_SAVE_BAIT_COUNT,
-                value=llm.DEFAULT_SAVE_BAIT_COUNT,
-                key="save_share_amount",
-            )
-            if st.button(tr("Generate Save Prompts"), key="auto_generate_save_share"):
-                if not params.video_subject:
-                    st.error(tr("Please Enter the Video Subject"))
-                else:
-                    with st.spinner(tr("Generating Save Prompts")):
-                        st.session_state["save_share_prompts"] = llm.generate_save_share_prompts(
-                            video_subject=params.video_subject,
-                            language=(
-                                params.video_language
-                                or st.session_state.get("ui_language", "")
-                            ),
-                            amount=save_share_amount,
-                        )
+        if social_view == "Save Share Prompts":
+            with st.container(border=True):
+                st.write(tr("Save Share Prompts"))
+                st.caption(tr("Save Share Hint"))
+                save_share_amount = st.slider(
+                    tr("Number of Save Prompts"),
+                    min_value=1,
+                    max_value=llm.MAX_SAVE_BAIT_COUNT,
+                    value=llm.DEFAULT_SAVE_BAIT_COUNT,
+                    key="save_share_amount",
+                )
+                if st.button(tr("Generate Save Prompts"), key="auto_generate_save_share"):
+                    if not params.video_subject:
+                        st.error(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Save Prompts")):
+                            st.session_state["save_share_prompts"] = llm.generate_save_share_prompts(
+                                video_subject=params.video_subject,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=save_share_amount,
+                            )
 
-            save_share_prompts = st.session_state.get("save_share_prompts") or []
-            if save_share_prompts:
-                for i, item in enumerate(save_share_prompts):
-                    with st.expander(
-                        f"🔖 {item.get('signal', '') or tr('Save Share Prompts')}: "
-                        f"{item.get('line', '')}",
-                        expanded=(i == 0),
-                    ):
-                        render_detail_fields(
-                            item,
-                            [
-                                ("signal", "Save Share Signal"),
-                                ("placement", "Save Share Placement"),
-                                ("why", "Save Share Why"),
-                            ],
-                        )
-                st.caption(tr("Save Share Use Hint"))
-            elif "save_share_prompts" in st.session_state:
-                st.info(tr("No Save Prompts"))
+                save_share_prompts = st.session_state.get("save_share_prompts") or []
+                if save_share_prompts:
+                    for i, item in enumerate(save_share_prompts):
+                        with st.expander(
+                            f"🔖 {item.get('signal', '') or tr('Save Share Prompts')}: "
+                            f"{item.get('line', '')}",
+                            expanded=(i == 0),
+                        ):
+                            render_detail_fields(
+                                item,
+                                [
+                                    ("signal", "Save Share Signal"),
+                                    ("placement", "Save Share Placement"),
+                                    ("why", "Save Share Why"),
+                                ],
+                            )
+                    st.caption(tr("Save Share Use Hint"))
+                elif "save_share_prompts" in st.session_state:
+                    st.info(tr("No Save Prompts"))
 
     with toolkit_tabs[2]:
         # Trending-sound helper. Music choice strongly affects a TikTok's reach, but

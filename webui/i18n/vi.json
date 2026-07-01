@@ -93,6 +93,7 @@
     "LLM API Key Help": "Dán khóa từ trang quản trị của nhà cung cấp AI. Không có khóa, các nút 'Tạo…' sẽ không viết được gì. Khóa Gemini miễn phí vẫn dùng được.",
     "Video Source Help": "Nơi lấy các đoạn clip nền. Pexels và Pixabay là thư viện video miễn phí (cần khóa API miễn phí); chọn 'local' để dùng tệp bạn tự tải lên.",
     "Step 2 Needs Subject": "💡 Hãy nhập sản phẩm ở **Bước 1** trước — mọi công cụ ở đây đều viết nội dung cho sản phẩm đó.",
+    "Choose a Copy Tool": "Chọn công cụ viết nội dung",
     "Generating Video": "Đang tạo video, vui lòng đợi...",
     "Start Generating Video": "Bắt Đầu Tạo Video",
     "Video Generation Completed": "Hoàn Tất Tạo Video",
