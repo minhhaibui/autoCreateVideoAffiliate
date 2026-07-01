@@ -501,6 +501,7 @@ if not config.app.get("hide_config", False):
                 tr("LLM Provider"),
                 options=llm_provider_labels,
                 index=saved_llm_provider_index,
+                help=tr("LLM Provider Help"),
             )
             llm_helper = st.container()
             llm_provider = llm_provider_values[llm_provider_label]
@@ -742,7 +743,10 @@ if not config.app.get("hide_config", False):
                 st.info(tips)
 
             st_llm_api_key = st.text_input(
-                tr("API Key"), value=llm_api_key, type="password"
+                tr("API Key"),
+                value=llm_api_key,
+                type="password",
+                help=tr("LLM API Key Help"),
             )
             st_llm_base_url = st.text_input(tr("Base Url"), value=llm_base_url)
             st_llm_model_name = ""
@@ -1906,6 +1910,7 @@ with step3:
             options=range(len(video_sources)),
             format_func=lambda x: video_sources[x][0],
             index=saved_video_source_index,
+            help=tr("Video Source Help"),
         )
         params.video_source = video_sources[selected_index][1]
         config.app["video_source"] = params.video_source
