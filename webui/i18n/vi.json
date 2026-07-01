@@ -81,6 +81,7 @@
     "Rounded Subtitle Background Help": "Mặc định tắt. Khi được bật, nền phụ đề sẽ dùng kiểu bo tròn mờ trong suốt, vừa khít với độ rộng của chữ.",
     "Generate Video": "Tạo Video",
     "Video Script and Subject Cannot Both Be Empty": "Chủ Đề Video và Kịch Bản Video không thể cùng trống",
+    "LLM Key Missing Banner": "⚠️ Để dùng các công cụ AI (gợi ý sản phẩm, kịch bản và toàn bộ công cụ viết nội dung), hãy mở **Cài Đặt Cơ Bản** ở trên cùng và dán khóa API LLM của bạn.",
     "Generating Video": "Đang tạo video, vui lòng đợi...",
     "Start Generating Video": "Bắt Đầu Tạo Video",
     "Video Generation Completed": "Hoàn Tất Tạo Video",

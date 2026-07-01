@@ -35,6 +35,7 @@ from app.services.campaign import (
     has_campaign,
 )
 from app.services.fonts import get_recommended_font
+from app.services.preflight import is_llm_ready
 from app.utils import utils
 
 st.set_page_config(
@@ -843,6 +844,17 @@ uploaded_audio_file = None
 # is on screen, and the persistent "Generate" footer below the tabs always works.
 # The steps follow the real affiliate workflow: set up the product & script, then
 # generate the supporting copy, then configure the video.
+# Pre-flight readiness banner. Every AI generator (product ideas, script, and
+# the whole toolkit) fails with a raw LLM error if no API key is set — the #1
+# first-run stumbling block for a non-technical user, because the key lives in
+# the collapsed "Basic Settings" expander with no up-front hint. Surface it once,
+# prominently, before the user clicks anything. Computed straight from config so
+# it works even when Basic Settings is hidden.
+_preflight_provider = config.app.get("llm_provider", "openai").lower()
+_preflight_key = config.app.get(f"{_preflight_provider}_api_key", "")
+if not is_llm_ready(_preflight_provider, _preflight_key):
+    st.warning(tr("LLM Key Missing Banner"))
+
 step1, step2, step3 = st.tabs([
     tr("Step 1 Product Script"),
     tr("Step 2 Copy Assets"),
@@ -2528,6 +2540,19 @@ if start_button:
     task_id = str(uuid4())
     if not params.video_subject and not params.video_script:
         st.error(tr("Video Script and Subject Cannot Both Be Empty"))
+        scroll_to_bottom()
+        st.stop()
+
+    # If there's no script yet, the render pipeline generates one via the LLM.
+    # Fail fast with a clear message instead of letting the task die mid-render
+    # when the provider has no API key.
+    if not (params.video_script or "").strip() and not is_llm_ready(
+        config.app.get("llm_provider", "openai").lower(),
+        config.app.get(
+            f"{config.app.get('llm_provider', 'openai').lower()}_api_key", ""
+        ),
+    ):
+        st.error(tr("LLM Key Missing Banner"))
         scroll_to_bottom()
         st.stop()
 
