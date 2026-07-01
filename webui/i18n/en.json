@@ -92,6 +92,7 @@
     "LLM Provider Help": "The AI service that writes your product ideas, script and copy. Gemini has a free tier that works well; whichever you pick, paste its API key below.",
     "LLM API Key Help": "Paste the key from your AI provider's dashboard. Without it, the 'Generate…' buttons cannot write anything. Free Gemini keys work.",
     "Video Source Help": "Where the background clips come from. Pexels and Pixabay are free stock libraries (need a free API key); choose 'local' to use your own uploaded files.",
+    "Step 2 Needs Subject": "💡 Add your product in **Step 1** first — every tool here writes copy for that product.",
     "Generating Video": "Generating video, please wait...",
     "Start Generating Video": "Start Generating Video",
     "Video Generation Completed": "Video Generation Completed",

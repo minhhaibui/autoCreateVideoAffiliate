@@ -1251,6 +1251,11 @@ with step1:
 
 with step2:
     st.caption(tr("Step 2 Caption"))
+    # Every copy helper here needs a product/subject, so a user who jumps
+    # straight to Step 2 with a blank Step 1 would only discover that by
+    # clicking a Generate button and getting an error. Nudge them first.
+    if not params.video_subject:
+        st.info(tr("Step 2 Needs Subject"))
     # The affiliate copy helpers are grouped into sub-tabs to stay readable.
     # (Streamlit st.tabs still runs every panel's body each rerun and just hides
     # the inactive ones with CSS — it's a layout aid, not lazy rendering.)
