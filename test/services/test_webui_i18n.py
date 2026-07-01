@@ -55,6 +55,24 @@ class TestWebuiI18n(unittest.TestCase):
 
         self.assertEqual(sorted(visitor.keys - ru_keys), [])
 
+    def test_vietnamese_locale_covers_english_locale(self):
+        # Vietnamese is the primary audience for this tool, so hold it to the
+        # same parity bar as Russian — no key may be missing (which would render
+        # a raw English fallback for a Vietnamese creator).
+        en_keys = set(_load_translation("en"))
+        vi_keys = set(_load_translation("vi"))
+
+        self.assertEqual(sorted(en_keys - vi_keys), [])
+
+    def test_vietnamese_locale_covers_static_webui_labels(self):
+        tree = ast.parse(WEBUI_MAIN.read_text(encoding="utf-8"))
+        visitor = _TrKeyVisitor()
+        visitor.visit(tree)
+
+        vi_keys = set(_load_translation("vi"))
+
+        self.assertEqual(sorted(visitor.keys - vi_keys), [])
+
     def test_script_language_options_include_russian(self):
         tree = ast.parse(WEBUI_MAIN.read_text(encoding="utf-8"))
         support_locales = None
