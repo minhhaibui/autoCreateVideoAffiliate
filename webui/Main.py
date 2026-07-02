@@ -1685,134 +1685,148 @@ with step2:
         # creators often don't know what to put on. This suggests sound STYLES plus a
         # keyword to search the in-app sound library (the LLM can't see live charts,
         # so it's framed as general patterns, not a real-time trending list).
-        with st.container(border=True):
-            st.write(tr("Trending Sounds"))
-            st.caption(tr("Trending Sounds Hint"))
-            sound_amount = st.slider(
-                tr("Number of Sounds"),
-                min_value=3,
-                max_value=llm.MAX_SOUND_COUNT,
-                value=llm.DEFAULT_SOUND_COUNT,
-                key="sound_amount",
-            )
-            if st.button(tr("Suggest Sounds"), key="auto_generate_sounds"):
-                if not params.video_subject:
-                    st.error(tr("Please Enter the Video Subject"))
-                else:
-                    with st.spinner(tr("Generating Sounds")):
-                        st.session_state["sound_ideas"] = llm.generate_sound_ideas(
-                            video_subject=params.video_subject,
-                            language=(
-                                params.video_language
-                                or st.session_state.get("ui_language", "")
-                            ),
-                            amount=sound_amount,
-                        )
+        onscreen_tools = [
+            "Trending Sounds",
+            "Text Stickers",
+            "Cover Text",
+        ]
+        onscreen_view = st.selectbox(
+            tr("Choose an On-screen Tool"),
+            options=onscreen_tools,
+            format_func=lambda k: tr(k),
+            key="onscreen_tool_view",
+        )
+        if onscreen_view == "Trending Sounds":
+            with st.container(border=True):
+                st.write(tr("Trending Sounds"))
+                st.caption(tr("Trending Sounds Hint"))
+                sound_amount = st.slider(
+                    tr("Number of Sounds"),
+                    min_value=3,
+                    max_value=llm.MAX_SOUND_COUNT,
+                    value=llm.DEFAULT_SOUND_COUNT,
+                    key="sound_amount",
+                )
+                if st.button(tr("Suggest Sounds"), key="auto_generate_sounds"):
+                    if not params.video_subject:
+                        st.error(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Sounds")):
+                            st.session_state["sound_ideas"] = llm.generate_sound_ideas(
+                                video_subject=params.video_subject,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=sound_amount,
+                            )
 
-            sound_ideas = st.session_state.get("sound_ideas") or []
-            if sound_ideas:
-                for i, idea in enumerate(sound_ideas):
-                    with st.expander(
-                        f"🎵 {idea.get('sound', '')}",
-                        expanded=(i == 0),
-                    ):
-                        render_detail_fields(
-                            idea,
-                            [
-                                ("vibe", "Sound Vibe"),
-                                ("search", "Sound Search"),
-                                ("tip", "Sound Tip"),
-                            ],
-                        )
-                st.caption(tr("Trending Sounds Use Hint"))
-            elif "sound_ideas" in st.session_state:
-                st.info(tr("No Sounds"))
+                sound_ideas = st.session_state.get("sound_ideas") or []
+                if sound_ideas:
+                    for i, idea in enumerate(sound_ideas):
+                        with st.expander(
+                            f"🎵 {idea.get('sound', '')}",
+                            expanded=(i == 0),
+                        ):
+                            render_detail_fields(
+                                idea,
+                                [
+                                    ("vibe", "Sound Vibe"),
+                                    ("search", "Sound Search"),
+                                    ("tip", "Sound Tip"),
+                                ],
+                            )
+                    st.caption(tr("Trending Sounds Use Hint"))
+                elif "sound_ideas" in st.session_state:
+                    st.info(tr("No Sounds"))
 
-        with st.container(border=True):
-            st.write(tr("Text Stickers"))
-            st.caption(tr("Text Stickers Hint"))
-            sticker_amount = st.slider(
-                tr("Number of Stickers"),
-                min_value=3,
-                max_value=llm.MAX_STICKER_COUNT,
-                value=llm.DEFAULT_STICKER_COUNT,
-                key="sticker_amount",
-            )
-            if st.button(tr("Generate Stickers"), key="auto_generate_stickers"):
-                if not params.video_subject:
-                    st.error(tr("Please Enter the Video Subject"))
-                else:
-                    with st.spinner(tr("Generating Stickers")):
-                        st.session_state["text_stickers"] = llm.generate_text_stickers(
-                            video_subject=params.video_subject,
-                            language=(
-                                params.video_language
-                                or st.session_state.get("ui_language", "")
-                            ),
-                            amount=sticker_amount,
-                        )
+        if onscreen_view == "Text Stickers":
+            with st.container(border=True):
+                st.write(tr("Text Stickers"))
+                st.caption(tr("Text Stickers Hint"))
+                sticker_amount = st.slider(
+                    tr("Number of Stickers"),
+                    min_value=3,
+                    max_value=llm.MAX_STICKER_COUNT,
+                    value=llm.DEFAULT_STICKER_COUNT,
+                    key="sticker_amount",
+                )
+                if st.button(tr("Generate Stickers"), key="auto_generate_stickers"):
+                    if not params.video_subject:
+                        st.error(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Stickers")):
+                            st.session_state["text_stickers"] = llm.generate_text_stickers(
+                                video_subject=params.video_subject,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=sticker_amount,
+                            )
 
-            text_stickers = st.session_state.get("text_stickers") or []
-            if text_stickers:
-                for i, sticker in enumerate(text_stickers):
-                    with st.expander(
-                        f"💬 {sticker.get('text', '')}",
-                        expanded=(i == 0),
-                    ):
-                        render_detail_fields(
-                            sticker,
-                            [
-                                ("timing", "Sticker Timing"),
-                                ("style", "Sticker Style"),
-                                ("purpose", "Sticker Purpose"),
-                            ],
-                        )
-                st.caption(tr("Text Stickers Use Hint"))
-            elif "text_stickers" in st.session_state:
-                st.info(tr("No Stickers"))
+                text_stickers = st.session_state.get("text_stickers") or []
+                if text_stickers:
+                    for i, sticker in enumerate(text_stickers):
+                        with st.expander(
+                            f"💬 {sticker.get('text', '')}",
+                            expanded=(i == 0),
+                        ):
+                            render_detail_fields(
+                                sticker,
+                                [
+                                    ("timing", "Sticker Timing"),
+                                    ("style", "Sticker Style"),
+                                    ("purpose", "Sticker Purpose"),
+                                ],
+                            )
+                    st.caption(tr("Text Stickers Use Hint"))
+                elif "text_stickers" in st.session_state:
+                    st.info(tr("No Stickers"))
 
-        with st.container(border=True):
-            st.write(tr("Cover Text"))
-            st.caption(tr("Cover Text Hint"))
-            cover_amount = st.slider(
-                tr("Number of Covers"),
-                min_value=2,
-                max_value=llm.MAX_COVER_COUNT,
-                value=llm.DEFAULT_COVER_COUNT,
-                key="cover_amount",
-            )
-            if st.button(tr("Generate Cover Text"), key="auto_generate_covers"):
-                if not params.video_subject:
-                    st.error(tr("Please Enter the Video Subject"))
-                else:
-                    with st.spinner(tr("Generating Cover Text")):
-                        st.session_state["cover_ideas"] = llm.generate_cover_text_ideas(
-                            video_subject=params.video_subject,
-                            language=(
-                                params.video_language
-                                or st.session_state.get("ui_language", "")
-                            ),
-                            amount=cover_amount,
-                        )
+        if onscreen_view == "Cover Text":
+            with st.container(border=True):
+                st.write(tr("Cover Text"))
+                st.caption(tr("Cover Text Hint"))
+                cover_amount = st.slider(
+                    tr("Number of Covers"),
+                    min_value=2,
+                    max_value=llm.MAX_COVER_COUNT,
+                    value=llm.DEFAULT_COVER_COUNT,
+                    key="cover_amount",
+                )
+                if st.button(tr("Generate Cover Text"), key="auto_generate_covers"):
+                    if not params.video_subject:
+                        st.error(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Cover Text")):
+                            st.session_state["cover_ideas"] = llm.generate_cover_text_ideas(
+                                video_subject=params.video_subject,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=cover_amount,
+                            )
 
-            cover_ideas = st.session_state.get("cover_ideas") or []
-            if cover_ideas:
-                for i, idea in enumerate(cover_ideas):
-                    with st.expander(
-                        f"🖼️ {idea.get('text', '')}",
-                        expanded=(i == 0),
-                    ):
-                        render_detail_fields(
-                            idea,
-                            [
-                                ("subtext", "Cover Subtext"),
-                                ("angle", "Cover Angle"),
-                                ("tip", "Cover Tip"),
-                            ],
-                        )
-                st.caption(tr("Cover Text Use Hint"))
-            elif "cover_ideas" in st.session_state:
-                st.info(tr("No Cover Text"))
+                cover_ideas = st.session_state.get("cover_ideas") or []
+                if cover_ideas:
+                    for i, idea in enumerate(cover_ideas):
+                        with st.expander(
+                            f"🖼️ {idea.get('text', '')}",
+                            expanded=(i == 0),
+                        ):
+                            render_detail_fields(
+                                idea,
+                                [
+                                    ("subtext", "Cover Subtext"),
+                                    ("angle", "Cover Angle"),
+                                    ("tip", "Cover Tip"),
+                                ],
+                            )
+                    st.caption(tr("Cover Text Use Hint"))
+                elif "cover_ideas" in st.session_state:
+                    st.info(tr("No Cover Text"))
 
     with toolkit_tabs[3]:
         # Export helper: bundle every generated asset (subject, hooks, script,
