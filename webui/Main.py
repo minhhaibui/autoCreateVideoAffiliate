@@ -26,6 +26,11 @@ from app.models.schema import (
 )
 from app.services import llm, voice
 from app.services import task as tm
+from app.services.batch import (
+    MAX_BATCH_ITEMS,
+    parse_batch_subjects,
+    summarize_batch_results,
+)
 from app.services.affiliate import build_affiliate_package_text, format_schedule_header
 from app.services.campaign import (
     CAMPAIGN_FIELDS,
@@ -2725,5 +2730,91 @@ if start_button:
     open_task_folder(task_id)
     logger.info(tr("Video Generation Completed"))
     scroll_to_bottom()
+
+# Batch mode — paste one product/subject per line and render a video for each,
+# reusing the current voice/source/subtitle settings. Every item runs with an
+# empty script so the pipeline generates one per subject, which makes the LLM
+# key mandatory here even when the single-video script box is filled in.
+with st.expander(f"📦 {tr('Batch Mode')}", expanded=False):
+    st.caption(tr("Batch Mode Hint"))
+    st.text_area(
+        tr("Batch Subjects"),
+        height=140,
+        key="batch_subjects",
+        placeholder=tr("Batch Subjects Placeholder"),
+    )
+    batch_button = st.button(
+        f"▶▶ {tr('Start Batch')}", use_container_width=True, key="start_batch_button"
+    )
+    if batch_button:
+        batch_text = st.session_state.get("batch_subjects", "")
+        batch_subjects = parse_batch_subjects(batch_text)
+        if not batch_subjects:
+            st.error(tr("Batch Needs Subjects"))
+            st.stop()
+        # v1 renders from online stock sources only; local uploads are wired to
+        # the single-video flow above.
+        if params.video_source not in ["pexels", "pixabay", "coverr"]:
+            st.error(tr("Batch Online Sources Only"))
+            st.stop()
+        batch_llm_provider = config.app.get("llm_provider", "openai").lower()
+        if not is_llm_ready(
+            batch_llm_provider,
+            config.app.get(f"{batch_llm_provider}_api_key", ""),
+        ):
+            st.error(tr("LLM Key Missing Banner"))
+            st.stop()
+        source_key_errors = {
+            "pexels": ("pexels_api_keys", "Please Enter the Pexels API Key"),
+            "pixabay": ("pixabay_api_keys", "Please Enter the Pixabay API Key"),
+            "coverr": ("coverr_api_keys", "Please Enter the Coverr API Key"),
+        }
+        source_config_key, source_error = source_key_errors[params.video_source]
+        if not config.app.get(source_config_key, ""):
+            st.error(tr(source_error))
+            st.stop()
+
+        config.save_config()
+        raw_lines = len([l for l in batch_text.splitlines() if l.strip()])
+        if raw_lines > len(batch_subjects):
+            st.info(
+                tr("Batch Kept Subjects").format(
+                    count=len(batch_subjects), max=MAX_BATCH_ITEMS
+                )
+            )
+        st.toast(tr("Generating Video"))
+        batch_progress = st.progress(0.0)
+        batch_results = []
+        for i, batch_subject in enumerate(batch_subjects):
+            batch_status = st.empty()
+            batch_status.info(f"({i + 1}/{len(batch_subjects)}) {batch_subject} …")
+            item_params = params.model_copy(deep=True)
+            item_params.video_subject = batch_subject
+            item_params.video_script = ""
+            item_params.video_terms = ""
+            try:
+                item_result = tm.start(task_id=str(uuid4()), params=item_params)
+                item_videos = (item_result or {}).get("videos", [])
+                item_error = "" if item_videos else tr("Video Generation Failed")
+            except Exception as e:
+                item_videos, item_error = [], str(e)
+            batch_results.append(
+                {"subject": batch_subject, "videos": item_videos, "error": item_error}
+            )
+            if item_videos:
+                batch_status.success(f"({i + 1}/{len(batch_subjects)}) {batch_subject}")
+            else:
+                batch_status.error(
+                    f"({i + 1}/{len(batch_subjects)}) {batch_subject} — {item_error}"
+                )
+            batch_progress.progress((i + 1) / len(batch_subjects))
+        st.code(summarize_batch_results(batch_results))
+        batch_ok = sum(1 for r in batch_results if r["videos"])
+        if batch_ok:
+            st.success(
+                tr("Batch Completed").format(ok=batch_ok, total=len(batch_results))
+            )
+        else:
+            st.error(tr("Video Generation Failed"))
 
 config.save_config()
