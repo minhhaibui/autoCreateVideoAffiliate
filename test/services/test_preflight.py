@@ -39,7 +39,14 @@ class TestIsLlmReady(unittest.TestCase):
         self.assertTrue(is_llm_ready("g4f", ""))
 
     def test_key_is_stripped_before_checking(self):
-        self.assertTrue(is_llm_ready("gemini", "  AQ.key  "))
+        self.assertTrue(is_llm_ready("gemini", "  AQ.Ab8cdEfGh1jK  "))
+
+    def test_truncated_key_is_not_ready(self):
+        # Regression: a real config.toml carried `gemini_api_key = "AQ.k"`
+        # after a save-while-running clobber; it passed the presence check and
+        # 401-ed mid-render. Implausibly short keys must warn up front.
+        self.assertFalse(is_llm_ready("gemini", "AQ.k"))
+        self.assertFalse(is_llm_ready("openai", "sk-1"))
 
 
 if __name__ == "__main__":
