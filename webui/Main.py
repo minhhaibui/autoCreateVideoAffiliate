@@ -1103,6 +1103,7 @@ with step1:
             (tr("Script Style Beauty Before After"), "beauty_before_after"),
             (tr("Script Style Home Transformation"), "home_transformation"),
             (tr("Script Style Fashion Styling"), "fashion_styling"),
+            (tr("Script Style Loop Rewatch"), "loop_rewatch"),
         ]
         saved_script_style = config.ui.get("script_style", "default")
         script_style_index = 0

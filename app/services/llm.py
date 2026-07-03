@@ -137,6 +137,21 @@ FASHION_STYLING_SCRIPT_SYSTEM_PROMPT = _affiliate_category_prompt(
     ],
 )
 
+# Rewatches are one of the strongest distribution signals on short-form video:
+# a script whose last line flows straight back into its first makes the replay
+# feel intentional and lifts completion past 100%. This preset bakes that
+# seamless-loop structure in.
+LOOP_REWATCH_SCRIPT_SYSTEM_PROMPT = _affiliate_category_prompt(
+    "TikTok Seamless-Loop Affiliate Script Writer",
+    [
+        "Hook: open in the first 3 seconds with a bold claim, question, or curiosity gap about the product — phrased so that the video's FINAL line can lead straight back into it.",
+        "Problem or desire: name the pain point or desire the product addresses.",
+        "Benefits: give two or three concrete, specific benefits framed as outcomes the viewer will get.",
+        "Call to action: tell viewers to tap the product link or cart — keep it quick and natural, before the closing line.",
+        "Loop closing: end with a short line that flows seamlessly back into the opening hook, so when the video replays the ending reads as the setup of the beginning. Never say goodbye, never thank the viewer, never signal that the video is over.",
+    ],
+)
+
 
 # Selectable script "styles" surfaced in the WebUI. A value of "" means use the
 # default system prompt; any other value is passed through as a custom system
@@ -148,6 +163,7 @@ SCRIPT_STYLE_PRESETS = {
     "beauty_before_after": BEAUTY_BEFORE_AFTER_SCRIPT_SYSTEM_PROMPT,
     "home_transformation": HOME_TRANSFORMATION_SCRIPT_SYSTEM_PROMPT,
     "fashion_styling": FASHION_STYLING_SCRIPT_SYSTEM_PROMPT,
+    "loop_rewatch": LOOP_REWATCH_SCRIPT_SYSTEM_PROMPT,
 }
 
 

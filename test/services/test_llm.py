@@ -1583,7 +1583,12 @@ class TestScriptVariants(unittest.TestCase):
 class TestScriptStylePresets(unittest.TestCase):
     """Category-aware affiliate script style presets."""
 
-    CATEGORY_KEYS = ("beauty_before_after", "home_transformation", "fashion_styling")
+    CATEGORY_KEYS = (
+        "beauty_before_after",
+        "home_transformation",
+        "fashion_styling",
+        "loop_rewatch",
+    )
 
     def test_default_and_unknown_return_empty(self):
         self.assertEqual(llm.get_script_style_system_prompt("default"), "")
@@ -1606,6 +1611,14 @@ class TestScriptStylePresets(unittest.TestCase):
         self.assertIn("Before", prompts["beauty_before_after"])
         self.assertIn("space", prompts["home_transformation"])
         self.assertIn("outfit", prompts["fashion_styling"])
+        self.assertIn("replays", prompts["loop_rewatch"])
+
+    def test_loop_preset_forbids_signoff_and_keeps_cta_before_close(self):
+        prompt = llm.get_script_style_system_prompt("loop_rewatch")
+        self.assertIn("Never say goodbye", prompt)
+        # The CTA step must come before the loop-closing step so the replay
+        # seam stays clean.
+        self.assertLess(prompt.index("Call to action"), prompt.index("Loop closing"))
 
 
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
