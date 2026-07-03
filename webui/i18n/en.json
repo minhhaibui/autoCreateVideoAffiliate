@@ -98,6 +98,7 @@
     "Batch Mode": "Batch mode — many videos at once",
     "Batch Mode Hint": "Paste one product or subject per line. Each line becomes its own video using the current voice, video-source and subtitle settings; the script is generated automatically for every subject, so a working LLM API key is required. A line may also carry its own price, discount code and affiliate link separated by | (in any order) — e.g. \"Air fryer | 49$ | SALE50 | https://…\". Those lines get their own burned CTA / end card (when enabled) and a ready-to-paste pinned comment in the final report; the link and code are used verbatim.",
     "Batch Subjects": "Product / subject list (one per line)",
+    "Download Batch Report": "Download Batch Report (.txt)",
     "Batch Subjects Placeholder": "Air fryer\nLip balm | 12$ | LIP10 | https://example.com/lip\nSmart night light",
     "Start Batch": "Start batch render",
     "Batch Needs Subjects": "Please enter at least one product or subject (one per line).",

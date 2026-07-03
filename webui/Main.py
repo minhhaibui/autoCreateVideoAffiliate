@@ -2833,13 +2833,35 @@ with st.expander(f"📦 {tr('Batch Mode')}", expanded=False):
                     f"({i + 1}/{len(batch_items)}) {batch_subject} — {item_error}"
                 )
             batch_progress.progress((i + 1) / len(batch_items))
-        st.code(summarize_batch_results(batch_results))
-        batch_ok = sum(1 for r in batch_results if r["videos"])
-        if batch_ok:
+        # Stash the report in session_state: everything rendered inside this
+        # click-block vanishes on the next rerun (any widget interaction), and
+        # the report carries the per-item links/codes the user still needs.
+        st.session_state["batch_last_summary"] = summarize_batch_results(
+            batch_results
+        )
+        st.session_state["batch_last_ok"] = sum(
+            1 for r in batch_results if r["videos"]
+        )
+        st.session_state["batch_last_total"] = len(batch_results)
+
+    # Persistent report — survives reruns until the next batch overwrites it.
+    if st.session_state.get("batch_last_summary"):
+        st.code(st.session_state["batch_last_summary"])
+        if st.session_state.get("batch_last_ok"):
             st.success(
-                tr("Batch Completed").format(ok=batch_ok, total=len(batch_results))
+                tr("Batch Completed").format(
+                    ok=st.session_state["batch_last_ok"],
+                    total=st.session_state["batch_last_total"],
+                )
             )
         else:
             st.error(tr("Video Generation Failed"))
+        st.download_button(
+            f"💾 {tr('Download Batch Report')}",
+            data=st.session_state["batch_last_summary"],
+            file_name="batch_report.txt",
+            mime="text/plain",
+            key="download_batch_report",
+        )
 
 config.save_config()
