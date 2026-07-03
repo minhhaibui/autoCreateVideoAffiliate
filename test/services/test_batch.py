@@ -52,6 +52,85 @@ class TestParseBatchSubjects(unittest.TestCase):
         self.assertEqual(batch.parse_batch_subjects("   \n \n"), [])
 
 
+class TestParseBatchItems(unittest.TestCase):
+    def test_plain_line_has_empty_extras(self):
+        self.assertEqual(
+            batch.parse_batch_items("Nồi chiên không dầu"),
+            [
+                {
+                    "subject": "Nồi chiên không dầu",
+                    "price": "",
+                    "code": "",
+                    "link": "",
+                }
+            ],
+        )
+
+    def test_full_line_in_canonical_order(self):
+        items = batch.parse_batch_items(
+            "Áo thun nam | 199k | SALE50 | https://s.shopee.vn/abc"
+        )
+        self.assertEqual(
+            items,
+            [
+                {
+                    "subject": "Áo thun nam",
+                    "price": "199k",
+                    "code": "SALE50",
+                    "link": "https://s.shopee.vn/abc",
+                }
+            ],
+        )
+
+    def test_extras_are_recognized_in_any_order(self):
+        items = batch.parse_batch_items(
+            "Máy hút bụi | https://ví-dụ.vn/x | 1.299.000đ"
+        )
+        self.assertEqual(items[0]["link"], "https://ví-dụ.vn/x")
+        self.assertEqual(items[0]["price"], "1.299.000đ")
+        self.assertEqual(items[0]["code"], "")
+
+    def test_price_shapes(self):
+        for price in ["199k", "1.299.000đ", "$15.99", "15.99 USD", "30%", "12"]:
+            items = batch.parse_batch_items(f"Sản phẩm | {price}")
+            self.assertEqual(items[0]["price"], price, price)
+
+    def test_code_with_digits_is_not_a_price(self):
+        items = batch.parse_batch_items("Sản phẩm | 50OFF")
+        self.assertEqual(items[0]["code"], "50OFF")
+        self.assertEqual(items[0]["price"], "")
+
+    def test_www_link_and_first_match_wins(self):
+        items = batch.parse_batch_items(
+            "Sản phẩm | www.shopee.vn/a | https://shopee.vn/b | GIAM30 | MA2"
+        )
+        self.assertEqual(items[0]["link"], "www.shopee.vn/a")
+        self.assertEqual(items[0]["code"], "GIAM30")
+
+    def test_empty_extras_and_list_prefixes(self):
+        items = batch.parse_batch_items("1. Đèn ngủ |  | SALE10 |")
+        self.assertEqual(items[0]["subject"], "Đèn ngủ")
+        self.assertEqual(items[0]["code"], "SALE10")
+
+    def test_dedupes_by_subject_and_caps(self):
+        text = "Son dưỡng | 99k\nSON DƯỠNG | 89k\n" + "\n".join(
+            f"Sản phẩm {i}" for i in range(20)
+        )
+        items = batch.parse_batch_items(text)
+        self.assertEqual(len(items), batch.MAX_BATCH_ITEMS)
+        self.assertEqual(items[0], {
+            "subject": "Son dưỡng", "price": "99k", "code": "", "link": ""
+        })
+
+    def test_has_batch_extras(self):
+        self.assertFalse(
+            batch.has_batch_extras(batch.parse_batch_items("Chỉ chủ đề")[0])
+        )
+        self.assertTrue(
+            batch.has_batch_extras(batch.parse_batch_items("Sản phẩm | 99k")[0])
+        )
+
+
 class TestSummarizeBatchResults(unittest.TestCase):
     def test_mixed_results(self):
         results = [
@@ -72,6 +151,22 @@ class TestSummarizeBatchResults(unittest.TestCase):
 
     def test_empty_results(self):
         self.assertEqual(batch.summarize_batch_results([]), "0/0 OK")
+
+    def test_cta_block_is_indented_under_its_item(self):
+        results = [
+            {
+                "subject": "Nồi chiên",
+                "videos": ["/tasks/a/final-1.mp4"],
+                "error": "",
+                "cta": "🛒 Nồi chiên — 199k\n👉 Link: https://s.shopee.vn/abc",
+            },
+            {"subject": "Son dưỡng", "videos": [], "error": "no materials"},
+        ]
+        summary = batch.summarize_batch_results(results)
+        self.assertIn("   🛒 Nồi chiên — 199k", summary)
+        self.assertIn("   👉 Link: https://s.shopee.vn/abc", summary)
+        # Items without a cta key render exactly like before.
+        self.assertIn("2. [FAILED] Son dưỡng (no materials)", summary)
 
 
 if __name__ == "__main__":
