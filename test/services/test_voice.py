@@ -715,6 +715,18 @@ class TestVoiceService(unittest.TestCase):
         self.assertEqual(vs.convert_rate_to_percent(1.5), "+50%")
         self.assertEqual(vs.convert_rate_to_percent(0.8), "-20%")
 
+    def test_convert_rate_to_percent_guards_invalid_rates(self):
+        # Hand-edited configs and raw API payloads can carry a missing or
+        # nonsense voice_rate; those must fall back to normal speed instead
+        # of crashing the whole render inside edge-tts.
+        self.assertEqual(vs.convert_rate_to_percent(None), "+0%")
+        self.assertEqual(vs.convert_rate_to_percent(""), "+0%")
+        self.assertEqual(vs.convert_rate_to_percent("abc"), "+0%")
+        self.assertEqual(vs.convert_rate_to_percent(0), "+0%")
+        self.assertEqual(vs.convert_rate_to_percent(-0.5), "+0%")
+        # Numeric strings still work.
+        self.assertEqual(vs.convert_rate_to_percent("1.5"), "+50%")
+
 
 if __name__ == "__main__":
     # python -m unittest test.services.test_voice.TestVoiceService.test_azure_tts_v1

@@ -363,11 +363,20 @@ def tts(
     return azure_tts_v1(text, voice_name, voice_rate, voice_file)
 
 
-def convert_rate_to_percent(rate: float) -> str:
+def convert_rate_to_percent(rate) -> str:
     # edge-tts requires a sign-prefixed percentage (e.g. "+0%", "-20%").
     # Rounding can yield 0 for rates near but not equal to 1.0 (e.g. 1.004,
     # 0.997); those must still be returned as "+0%", not the unsigned "0%"
     # which edge-tts rejects with ValueError: Invalid rate '0%'.
+    # A missing or nonsense rate (None, "", non-numeric, zero or negative —
+    # seen from hand-edited configs and raw API payloads) must not abort the
+    # whole render; treat it as normal speed instead.
+    try:
+        rate = float(rate)
+    except (TypeError, ValueError):
+        rate = 1.0
+    if rate <= 0:
+        rate = 1.0
     percent = round((rate - 1.0) * 100)
     if percent >= 0:
         return f"+{percent}%"
