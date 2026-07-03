@@ -131,6 +131,36 @@ class TestParseBatchItems(unittest.TestCase):
         )
 
 
+class TestFormatBatchCopy(unittest.TestCase):
+    def test_full_bundle(self):
+        block = batch.format_batch_copy(
+            {
+                "title": "Nồi chiên xịn",
+                "caption": "Giòn rụm không dầu mỡ!",
+                "hashtags": ["#noichien", "#bepnho"],
+            },
+            [{"comment": "Link ở đây nha 👇", "cta": "Chốt đơn ngay"}],
+        )
+        self.assertEqual(
+            block.splitlines(),
+            [
+                "Title: Nồi chiên xịn",
+                "Caption: Giòn rụm không dầu mỡ!",
+                "Hashtags: #noichien #bepnho",
+                "Pinned: Link ở đây nha 👇",
+            ],
+        )
+
+    def test_missing_pieces_are_skipped(self):
+        self.assertEqual(batch.format_batch_copy({}, []), "")
+        self.assertEqual(batch.format_batch_copy(None, None), "")
+        block = batch.format_batch_copy(
+            {"caption": "Chỉ caption", "hashtags": []},
+            [{"comment": "", "cta": "Mua ngay"}],
+        )
+        self.assertEqual(block.splitlines(), ["Caption: Chỉ caption", "Pinned: Mua ngay"])
+
+
 class TestSummarizeBatchResults(unittest.TestCase):
     def test_mixed_results(self):
         results = [
@@ -167,6 +197,21 @@ class TestSummarizeBatchResults(unittest.TestCase):
         self.assertIn("   👉 Link: https://s.shopee.vn/abc", summary)
         # Items without a cta key render exactly like before.
         self.assertIn("2. [FAILED] Son dưỡng (no materials)", summary)
+
+    def test_copy_block_renders_after_cta(self):
+        results = [
+            {
+                "subject": "Nồi chiên",
+                "videos": ["/t/a.mp4"],
+                "error": "",
+                "cta": "🛒 Nồi chiên — 199k",
+                "copy": "Caption: Giòn rụm!\nPinned: Link ở đây",
+            }
+        ]
+        summary = batch.summarize_batch_results(results)
+        self.assertIn("   Caption: Giòn rụm!", summary)
+        self.assertIn("   Pinned: Link ở đây", summary)
+        self.assertLess(summary.index("🛒"), summary.index("Caption:"))
 
 
 if __name__ == "__main__":

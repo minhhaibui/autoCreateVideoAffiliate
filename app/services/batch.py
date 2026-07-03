@@ -89,14 +89,40 @@ def parse_batch_subjects(text, max_items=MAX_BATCH_ITEMS):
     return [item["subject"] for item in parse_batch_items(text, max_items)]
 
 
+def format_batch_copy(metadata, pinned_comments):
+    """Fold one item's generated publish copy into a plain-text report block.
+
+    ``metadata`` is generate_social_metadata's ``{"title", "caption",
+    "hashtags"}`` dict; ``pinned_comments`` is generate_pinned_comments' list,
+    of which only the first entry is used (its ``comment`` normally already
+    ends on its ``cta`` line, so the cta is only a fallback). Missing pieces
+    are skipped. Returns '' when there is nothing to show.
+    """
+    lines = []
+    metadata = metadata or {}
+    if metadata.get("title"):
+        lines.append(f"Title: {metadata['title']}")
+    if metadata.get("caption"):
+        lines.append(f"Caption: {metadata['caption']}")
+    hashtags = [h for h in (metadata.get("hashtags") or []) if h]
+    if hashtags:
+        lines.append("Hashtags: " + " ".join(hashtags))
+    first_pinned = (pinned_comments[0] if pinned_comments else {}) or {}
+    pinned = first_pinned.get("comment") or first_pinned.get("cta")
+    if pinned:
+        lines.append(f"Pinned: {pinned}")
+    return "\n".join(lines)
+
+
 def summarize_batch_results(results):
     """Build a plain-text batch report from per-item result dicts.
 
     Each item is ``{"subject": str, "videos": [paths], "error": str}`` where
     ``videos`` is empty on failure and ``error`` is empty on success. An item
     may also carry ``"cta"`` — a ready-to-paste pinned-comment block built
-    from that line's own campaign fields — which is indented under the item
-    so the link and code travel with the report verbatim. The summary is
+    from that line's own campaign fields — and ``"copy"`` — the generated
+    caption / pinned-comment bundle. Both are indented under the item so the
+    links, codes and copy travel with the report. The summary itself is
     deterministic so it can be shown and exported as-is.
     """
     lines = []
@@ -111,6 +137,7 @@ def summarize_batch_results(results):
         else:
             reason = r.get("error") or "failed"
             lines.append(f"{i}. [FAILED] {subject} ({reason})")
-        for cta_line in (r.get("cta") or "").splitlines():
-            lines.append(f"   {cta_line}")
+        for extra in ("cta", "copy"):
+            for extra_line in (r.get(extra) or "").splitlines():
+                lines.append(f"   {extra_line}")
     return "\n".join(lines)

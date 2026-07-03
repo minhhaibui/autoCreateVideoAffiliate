@@ -99,6 +99,8 @@
     "Batch Mode Hint": "Dán mỗi dòng một sản phẩm hoặc chủ đề. Mỗi dòng sẽ thành một video riêng, dùng chung cài đặt giọng đọc, nguồn video và phụ đề hiện tại; kịch bản được tự động tạo cho từng chủ đề nên bắt buộc phải có API key LLM hoạt động. Mỗi dòng còn có thể kèm giá, mã giảm và link tiếp thị riêng, ngăn cách bằng | (thứ tự tùy ý) — ví dụ \"Nồi chiên không dầu | 1.299.000đ | SALE50 | https://…\". Dòng nào có thông tin riêng sẽ được gắn CTA / màn hình kết riêng (nếu đang bật) và kèm sẵn bình luận ghim trong báo cáo cuối; link và mã được giữ nguyên từng ký tự.",
     "Batch Subjects": "Danh sách sản phẩm / chủ đề (mỗi dòng một mục)",
     "Download Batch Report": "Tải báo cáo batch (.txt)",
+    "Batch Generate Copy": "Viết luôn caption & bình luận ghim cho từng sản phẩm",
+    "Batch Generate Copy Help": "Sau khi video của mỗi sản phẩm render xong, AI sẽ viết thêm tiêu đề, caption, hashtag và một bình luận ghim cho sản phẩm đó, gắn vào báo cáo batch bên dưới (kèm file .txt tải về). Tốn thêm một-hai lượt gọi AI cho mỗi sản phẩm.",
     "Batch Subjects Placeholder": "Nồi chiên không dầu\nSon dưỡng môi | 99k | LIP10 | https://example.com/son\nĐèn ngủ thông minh",
     "Start Batch": "Chạy tạo video hàng loạt",
     "Batch Needs Subjects": "Vui lòng nhập ít nhất một sản phẩm hoặc chủ đề (mỗi dòng một mục).",

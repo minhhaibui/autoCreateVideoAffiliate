@@ -28,6 +28,7 @@ from app.services import llm, voice
 from app.services import task as tm
 from app.services.batch import (
     MAX_BATCH_ITEMS,
+    format_batch_copy,
     has_batch_extras,
     parse_batch_items,
     summarize_batch_results,
@@ -2745,6 +2746,11 @@ with st.expander(f"📦 {tr('Batch Mode')}", expanded=False):
         key="batch_subjects",
         placeholder=tr("Batch Subjects Placeholder"),
     )
+    batch_copy_enabled = st.checkbox(
+        tr("Batch Generate Copy"),
+        key="batch_generate_copy",
+        help=tr("Batch Generate Copy Help"),
+    )
     batch_button = st.button(
         f"▶▶ {tr('Start Batch')}", use_container_width=True, key="start_batch_button"
     )
@@ -2819,12 +2825,37 @@ with st.expander(f"📦 {tr('Batch Mode')}", expanded=False):
                 item_error = "" if item_videos else tr("Video Generation Failed")
             except Exception as e:
                 item_videos, item_error = [], str(e)
+            # Publish copy per rendered product (opt-in): one caption bundle +
+            # one pinned comment, folded into the report. Only for successful
+            # renders (no reason to spend LLM quota on failed items), and a
+            # copy failure never fails the item — the video already exists.
+            item_copy = ""
+            if batch_copy_enabled and item_videos:
+                try:
+                    item_meta = llm.generate_social_metadata(
+                        video_subject=batch_subject,
+                        language=(
+                            params.video_language or llm.DEFAULT_SOCIAL_LANGUAGE
+                        ),
+                    )
+                    item_pinned = llm.generate_pinned_comments(
+                        video_subject=batch_subject,
+                        language=(
+                            params.video_language
+                            or st.session_state.get("ui_language", "")
+                        ),
+                        amount=1,
+                    )
+                    item_copy = format_batch_copy(item_meta, item_pinned)
+                except Exception as e:
+                    logger.warning(f"batch copy generation failed: {e}")
             batch_results.append(
                 {
                     "subject": batch_subject,
                     "videos": item_videos,
                     "error": item_error,
                     "cta": item_cta,
+                    "copy": item_copy,
                 }
             )
             if item_videos:
