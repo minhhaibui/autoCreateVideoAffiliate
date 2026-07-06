@@ -1537,6 +1537,102 @@ class TestSaveSharePrompts(unittest.TestCase):
             self.assertEqual(llm.generate_save_share_prompts(video_subject="x"), [])
 
 
+class TestPerformanceReview(unittest.TestCase):
+    """Phân tích số liệu video của chính creator (insight/evidence/action)."""
+
+    STATS = (
+        "Mini blender, question hook - 12400 views, 320 likes, 41 saves, 18 orders\n"
+        "Hair dryer, before/after - 48000 views, 900 likes, 12 saves, 5 orders"
+    )
+
+    def test_generate_performance_review_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "insight": "Question hooks convert better",
+                    "evidence": "18 orders on 12,400 views vs 5 orders on 48,000",
+                    "action": "Reuse the question hook on the next product",
+                },
+                {
+                    "insight": "Saves track orders more than likes",
+                    "evidence": "41 saves → 18 orders; 900 likes → 5 orders",
+                    "action": "Add an explicit save prompt",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            insights = llm.generate_performance_review(stats_text=self.STATS)
+
+        self.assertEqual(len(insights), 2)
+        self.assertEqual(insights[0]["insight"], "Question hooks convert better")
+        for item in insights:
+            self.assertEqual(set(item.keys()), set(llm.PERFORMANCE_KEYS))
+
+    def test_generate_performance_review_drops_items_without_insight(self):
+        payload = json.dumps(
+            [
+                {"evidence": "no insight", "action": "dropped"},
+                "not a dict",
+                {"insight": "Only this survives", "action": "keep it"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            insights = llm.generate_performance_review(stats_text=self.STATS)
+
+        self.assertEqual(len(insights), 1)
+        self.assertEqual(insights[0]["insight"], "Only this survives")
+
+    def test_generate_performance_review_recovers_embedded_json(self):
+        payload = 'Here: [{"insight": "Fewer views, more orders wins"}] done'
+        with patch.object(llm, "_generate_response", return_value=payload):
+            insights = llm.generate_performance_review(stats_text=self.STATS)
+
+        self.assertEqual(len(insights), 1)
+        self.assertEqual(insights[0]["insight"], "Fewer views, more orders wins")
+
+    def test_generate_performance_review_embeds_stats_in_prompt(self):
+        with patch.object(llm, "_generate_response", return_value="[]") as mocked:
+            llm.generate_performance_review(stats_text=self.STATS)
+
+        prompt = mocked.call_args[0][0]
+        self.assertIn("12400 views", prompt)
+        self.assertIn("NEVER invent numbers", prompt)
+
+    def test_generate_performance_review_truncates_long_stats(self):
+        long_stats = "x" * (llm.MAX_PERFORMANCE_STATS_LENGTH + 500)
+        with patch.object(llm, "_generate_response", return_value="[]") as mocked:
+            llm.generate_performance_review(stats_text=long_stats)
+
+        prompt = mocked.call_args[0][0]
+        self.assertNotIn("x" * (llm.MAX_PERFORMANCE_STATS_LENGTH + 1), prompt)
+
+    def test_generate_performance_review_clamps_amount(self):
+        self.assertEqual(
+            llm._clamp_count(
+                999,
+                llm.DEFAULT_PERFORMANCE_INSIGHT_COUNT,
+                llm.MAX_PERFORMANCE_INSIGHT_COUNT,
+            ),
+            llm.MAX_PERFORMANCE_INSIGHT_COUNT,
+        )
+        self.assertEqual(
+            llm._clamp_count(
+                0,
+                llm.DEFAULT_PERFORMANCE_INSIGHT_COUNT,
+                llm.MAX_PERFORMANCE_INSIGHT_COUNT,
+            ),
+            1,
+        )
+
+    def test_generate_performance_review_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(
+                llm.generate_performance_review(stats_text=self.STATS), []
+            )
+
+
 class TestScriptVariants(unittest.TestCase):
     """A/B full-script variant generation (reuses generate_script per variant)."""
 

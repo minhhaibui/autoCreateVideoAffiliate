@@ -1393,6 +1393,7 @@ with step2:
             "Pinned Comment",
             "Affiliate Disclosure",
             "Save Share Prompts",
+            "Performance Review",
         ]
         social_view = st.selectbox(
             tr("Choose a Copy Tool"),
@@ -1687,6 +1688,63 @@ with step2:
                     st.caption(tr("Save Share Use Hint"))
                 elif "save_share_prompts" in st.session_state:
                     st.info(tr("No Save Prompts"))
+
+        # Performance review — the post-publish half of the loop. Every other
+        # tool here works BEFORE posting; the 2026 playbook is publish → read
+        # your own numbers → repeat the winners. The creator pastes their
+        # per-video stats free-form; insights must quote those numbers and
+        # never invent benchmarks (same honesty rule as link/code verbatim).
+        if social_view == "Performance Review":
+            with st.container(border=True):
+                st.write(tr("Performance Review"))
+                st.caption(tr("Performance Review Hint"))
+                performance_stats = st.text_area(
+                    tr("Paste Video Stats"),
+                    key="performance_stats_input",
+                    height=160,
+                    placeholder=tr("Performance Stats Placeholder"),
+                )
+                performance_amount = st.slider(
+                    tr("Number of Insights"),
+                    min_value=1,
+                    max_value=llm.MAX_PERFORMANCE_INSIGHT_COUNT,
+                    value=llm.DEFAULT_PERFORMANCE_INSIGHT_COUNT,
+                    key="performance_amount",
+                )
+                if st.button(
+                    tr("Generate Performance Review"),
+                    key="auto_generate_performance_review",
+                ):
+                    if not performance_stats.strip():
+                        st.error(tr("Please Paste Video Stats"))
+                    else:
+                        with st.spinner(tr("Generating Performance Review")):
+                            st.session_state["performance_insights"] = llm.generate_performance_review(
+                                stats_text=performance_stats,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=performance_amount,
+                            )
+
+                performance_insights = st.session_state.get("performance_insights") or []
+                if performance_insights:
+                    for i, item in enumerate(performance_insights):
+                        with st.expander(
+                            f"📊 {item.get('insight', '')}",
+                            expanded=(i == 0),
+                        ):
+                            render_detail_fields(
+                                item,
+                                [
+                                    ("evidence", "Performance Evidence"),
+                                    ("action", "Performance Action"),
+                                ],
+                            )
+                    st.caption(tr("Performance Review Use Hint"))
+                elif "performance_insights" in st.session_state:
+                    st.info(tr("No Performance Insights"))
 
     with toolkit_tabs[2]:
         # Trending-sound helper. Music choice strongly affects a TikTok's reach, but

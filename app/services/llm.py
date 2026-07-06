@@ -2177,6 +2177,89 @@ Write {amount} short calls that make a viewer want to SAVE or SHARE a short affi
     return prompts[:amount]
 
 
+DEFAULT_PERFORMANCE_INSIGHT_COUNT = 4
+MAX_PERFORMANCE_INSIGHT_COUNT = 8
+MAX_PERFORMANCE_FIELD_LENGTH = 400
+MAX_PERFORMANCE_STATS_LENGTH = 4000
+
+PERFORMANCE_KEYS = ("insight", "evidence", "action")
+
+
+def generate_performance_review(
+    stats_text: str,
+    language: str = "",
+    amount: int = DEFAULT_PERFORMANCE_INSIGHT_COUNT,
+) -> List[dict]:
+    """Analyze the creator's OWN pasted per-video stats (views, likes, saves,
+    orders, GMV… one video per line, any format) and surface which of THEIR
+    patterns are winning — the post-publish half of the loop every other tool
+    here feeds into. Insights must be grounded strictly in the pasted numbers:
+    the prompt forbids invented benchmarks and requires each insight to quote
+    the actual figures it is based on, mirroring the verbatim-link honesty rule.
+
+    Returns a list of dicts with the keys in PERFORMANCE_KEYS (insight,
+    evidence, action). ``insight`` is the pattern found, ``evidence`` the
+    quoted numbers behind it, ``action`` the concrete next-video instruction.
+    On repeated failure an empty list is returned so the caller can show a
+    friendly message rather than crash.
+    """
+    amount = _clamp_count(
+        amount, DEFAULT_PERFORMANCE_INSIGHT_COUNT, MAX_PERFORMANCE_INSIGHT_COUNT
+    )
+    stats_text = _limit_social_text(
+        stats_text, MAX_PERFORMANCE_STATS_LENGTH, "stats_text"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "insight", "evidence" and "action" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the stats notes."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Performance Analyst
+
+## Goals:
+The creator pasted the stats of their OWN recent affiliate videos below (one video per line — typically a name/hook plus numbers like views, likes, comments, saves, clicks, orders or GMV, in any format). Find up to {amount} patterns in THIS data that tell the creator what to double down on and what to drop.
+
+## Important:
+1. compare the creator's videos AGAINST EACH OTHER — which hooks, products or formats got more completion, saves, clicks or orders relative to their other videos.
+2. conversion beats vanity: a video with fewer views but more orders/GMV is the better pattern to copy.
+3. every insight must be backed by numbers that actually appear in the pasted stats — quote them in "evidence".
+4. if the pasted data is too thin to support a conclusion (e.g. one video, or no order/click numbers), say exactly that in an insight and make the "action" what to start tracking.
+5. each "action" must be one concrete instruction for the NEXT video (e.g. "reuse the question-hook from video 2 on the kitchen product"), not generic advice.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "insight", "evidence", "action".
+   - "insight": the pattern found in the creator's own numbers.
+   - "evidence": the actual figures from the pasted stats this is based on.
+   - "action": one concrete instruction for the next video.
+3. {language_line}
+4. NEVER invent numbers, industry benchmarks, averages or comparisons that are not in the pasted stats.
+5. make the insights clearly different from each other; return fewer than {amount} rather than padding with weak ones.
+
+## Output Example:
+[{{"insight": "...", "evidence": "...", "action": "..."}}]
+
+## The creator's pasted stats:
+{stats_text}
+""".strip()
+
+    logger.info(
+        f"generating performance review: stats_chars={len(stats_text)}, "
+        f"amount={amount}, language={language!r}"
+    )
+
+    insights = _generate_json_object_list(
+        prompt,
+        lambda x: _coerce_keyed_dict(x, PERFORMANCE_KEYS, ("insight",), MAX_PERFORMANCE_FIELD_LENGTH),
+        "performance review",
+    )
+    return insights[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(
