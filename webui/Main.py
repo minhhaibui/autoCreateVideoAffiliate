@@ -399,6 +399,16 @@ def _use_script_variant(index):
         st.session_state["video_script"] = variants[index]
 
 
+def _save_channel_niche():
+    """Persist the account's channel niche to config the moment it is edited —
+    it is account-level state (like API keys), not per-session state, because
+    an affiliate account runs exactly one niche."""
+    config.app["channel_niche"] = st.session_state.get(
+        "channel_niche_input", ""
+    ).strip()
+    config.save_config()
+
+
 def render_detail_fields(item, fields):
     """Render each present optional field of a generated affiliate item as a
     bold-labelled markdown line. ``fields`` is a list of (item_key, tr_label_key)
@@ -898,6 +908,18 @@ step1, step2, step3 = st.tabs([
 
 with step1:
     st.caption(tr("Step 1 Caption"))
+    # The account's ONE niche (affiliate accounts don't mix niches — topical
+    # authority). Persisted in config via on_change; the product finder and the
+    # social caption anchor to it so content never drifts off-topic.
+    channel_niche = st.text_input(
+        tr("Channel Niche"),
+        value=config.app.get("channel_niche", ""),
+        key="channel_niche_input",
+        placeholder=tr("Channel Niche Placeholder"),
+        help=tr("Channel Niche Help"),
+        on_change=_save_channel_niche,
+    ).strip()
+
     # AI product-idea finder for TikTok affiliate. Rendered before the script
     # settings so a "use as subject" click can populate the video_subject widget
     # on the next rerun without a session-state/widget conflict.
@@ -925,10 +947,15 @@ with step1:
             key="product_idea_amount",
         )
 
+        # The channel niche is the default lane: an empty category box means
+        # "my account's niche", not "any niche".
+        if not idea_category and channel_niche:
+            st.caption(f'{tr("Anchored to Channel Niche")}: **{channel_niche}**')
+
         if st.button(tr("Suggest Products"), key="auto_generate_product_ideas"):
             with st.spinner(tr("Suggesting Products")):
                 st.session_state["product_ideas"] = llm.generate_product_ideas(
-                    category=idea_category,
+                    category=(idea_category or channel_niche),
                     market=idea_market,
                     language=st.session_state.get("ui_language", ""),
                     amount=idea_amount,
@@ -1432,6 +1459,7 @@ with step2:
                                 video_script=current_script,
                                 language=(params.video_language or llm.DEFAULT_SOCIAL_LANGUAGE),
                                 platform=social_platform,
+                                niche=channel_niche,
                             )
 
                 social_meta = st.session_state.get("social_metadata")
@@ -2895,6 +2923,7 @@ with st.expander(f"📦 {tr('Batch Mode')}", expanded=False):
                         language=(
                             params.video_language or llm.DEFAULT_SOCIAL_LANGUAGE
                         ),
+                        niche=channel_niche,
                     )
                     item_pinned = llm.generate_pinned_comments(
                         video_subject=batch_subject,

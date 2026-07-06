@@ -709,6 +709,22 @@ class TestSocialMetadata(unittest.TestCase):
 
         self.assertIn("TikTok", prompt)
 
+    def test_build_prompt_includes_niche_when_given(self):
+        """Chủ đề kênh (1 niche / account): prompt phải khóa caption + hashtag
+        vào niche khi caller truyền vào."""
+        prompt = llm.build_social_metadata_prompt(
+            video_subject="mini blender",
+            niche="kitchen gadgets",
+        )
+
+        self.assertIn('this niche: "kitchen gadgets"', prompt)
+        self.assertIn("niche-level", prompt)
+
+    def test_build_prompt_omits_niche_when_absent(self):
+        prompt = llm.build_social_metadata_prompt(video_subject="mini blender")
+
+        self.assertNotIn("niche", prompt.lower())
+
     def test_normalize_hashtags_from_string_dedupes_and_clamps(self):
         tags = llm._normalize_hashtags("#fyp fyp, trending #Trending viral", count=2)
 

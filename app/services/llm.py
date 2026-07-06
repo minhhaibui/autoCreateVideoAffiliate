@@ -1111,6 +1111,7 @@ def build_social_metadata_prompt(
     video_script: str = "",
     language: str = DEFAULT_SOCIAL_LANGUAGE,
     platform: str = DEFAULT_SOCIAL_PLATFORM,
+    niche: str = "",
 ) -> str:
     video_subject = _limit_social_text(
         video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
@@ -1118,10 +1119,18 @@ def build_social_metadata_prompt(
     video_script = _limit_social_text(
         video_script, MAX_SOCIAL_SCRIPT_LENGTH, "video_script"
     )
+    niche = _limit_social_text(niche, MAX_SOCIAL_SUBJECT_LENGTH, "niche")
     platform = _resolve_social_platform(platform)
     spec = SOCIAL_PLATFORMS[platform]
     label = SOCIAL_PLATFORM_LABELS.get(platform, platform)
     language_instruction = _social_language_instruction(language)
+    # Affiliate accounts run ONE niche (topical authority); when the caller
+    # passes it, the copy must stay in that lane and carry niche-level hashtags.
+    niche_instruction = (
+        f'\n7. The account posts ONLY about this niche: "{niche}". Keep the title and caption voice consistent with it, and make at least 2 hashtags niche-level (about the niche itself, not just this product).'
+        if niche
+        else ""
+    )
 
     prompt = f"""
 # Role: Short-Video Social Media Copywriter
@@ -1135,7 +1144,7 @@ Write engaging publishing metadata for a short video that will be posted on {lab
 3. "title": a catchy hook, at most {spec['title_max']} characters.
 4. "caption": an engaging description that ends with a call to action, at most {spec['caption_max']} characters. Do not put hashtags inside the caption.
 5. "hashtags": a JSON array of exactly {spec['hashtag_count']} strings. Each must start with "#", contain no spaces, and be relevant to the topic and to {label}.
-6. {language_instruction}
+6. {language_instruction}{niche_instruction}
 
 ## Output Example
 {{"title":"...","caption":"...","hashtags":["#example","#video"]}}
@@ -1202,6 +1211,7 @@ def generate_social_metadata(
     video_script: str = "",
     language: str = DEFAULT_SOCIAL_LANGUAGE,
     platform: str = DEFAULT_SOCIAL_PLATFORM,
+    niche: str = "",
 ) -> dict:
     """
     生成短视频发布文案元数据。
@@ -1223,6 +1233,7 @@ def generate_social_metadata(
         video_script=video_script,
         language=language,
         platform=platform,
+        niche=niche,
     )
     logger.info(
         f"generating social metadata: platform={platform}, language={language}"
