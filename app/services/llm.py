@@ -1389,6 +1389,83 @@ Suggest {amount} product ideas that tend to sell well for TikTok affiliate marke
     return ideas[:amount]
 
 
+RANKING_KEYS = ("product", "why")
+
+
+def rank_product_ideas(
+    ideas: List[dict],
+    niche: str = "",
+    language: str = "",
+) -> List[dict]:
+    """Order candidate product ideas by how likely a short AFFILIATE video made
+    from stock footage is to convert — the judge pass behind the autopilot's
+    "pick the most promising product" step. Judged on: impulse-buy price point,
+    how well stock clips can show the product's benefit (no live demo exists),
+    breadth of need, and strength of the video angle.
+
+    Returns a list of dicts with the keys in RANKING_KEYS (product, why),
+    best first. ``product`` echoes a candidate's name; ``why`` is one sentence
+    on its conversion potential. On repeated failure an empty list is returned
+    so the caller can fall back to the original order.
+    """
+    ideas = [i for i in (ideas or []) if (i or {}).get("product")]
+    if not ideas:
+        return []
+    language = (language or "").strip()
+
+    candidate_lines = "\n".join(
+        f'- "{i["product"]}"'
+        + (f' — {i.get("reason")}' if i.get("reason") else "")
+        + (f' (angle: {i.get("angle")})' if i.get("angle") else "")
+        for i in ideas
+    )
+    language_line = (
+        f'Write every "why" field in this language: {language}.'
+        if language
+        else 'Write every "why" field in the same language as the candidates.'
+    )
+    niche_line = f' The account\'s niche is: "{niche}".' if niche else ""
+
+    prompt = f"""
+# Role: TikTok Shop Affiliate Conversion Judge
+
+## Goals:
+Rank the candidate products below by how likely a short TikTok AFFILIATE video will actually drive orders.{niche_line} The video will be narrated over STOCK footage (no live demo, no creator on camera), so judge what that format can sell.
+
+## Judge by:
+1. impulse-buy price point (low/mid price converts far better from a short video than high-ticket).
+2. how well generic stock clips can make the benefit obvious without a live demo.
+3. how many viewers have the underlying need (broad beats narrow).
+4. how strong and concrete the stated video angle is.
+
+## Constrains:
+1. return ONLY a json-array of objects, BEST candidate first. do not return any text before or after the json.
+2. each object must have exactly these keys: "product", "why".
+   - "product": the candidate's name, copied EXACTLY as written above.
+   - "why": one sentence on its conversion potential in this format.
+3. {language_line}
+4. include every candidate exactly once; do not invent new products.
+
+## Output Example:
+[{{"product": "...", "why": "..."}}]
+
+## Candidates:
+{candidate_lines}
+""".strip()
+
+    logger.info(
+        f"ranking product ideas: candidates={len(ideas)}, niche={niche!r}, "
+        f"language={language!r}"
+    )
+
+    ranked = _generate_json_object_list(
+        prompt,
+        lambda x: _coerce_keyed_dict(x, RANKING_KEYS, ("product",), MAX_PRODUCT_FIELD_LENGTH),
+        "product ranking",
+    )
+    return ranked[: len(ideas)]
+
+
 # =============================================================================
 # TikTok affiliate hook generator
 #
