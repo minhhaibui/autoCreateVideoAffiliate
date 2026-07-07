@@ -411,6 +411,19 @@ def _send_ideas_to_batch():
     st.toast(tr("Ideas Sent to Batch"))
 
 
+def _send_calendar_to_batch():
+    """on_click callback: pour every planned day's subject into the Batch Mode
+    textarea, reusing the same deduping composer as the product-idea button."""
+    st.session_state["batch_subjects"] = append_ideas_to_batch(
+        st.session_state.get("batch_subjects", ""),
+        [
+            {"product": item.get("subject", "")}
+            for item in (st.session_state.get("content_calendar") or [])
+        ],
+    )
+    st.toast(tr("Ideas Sent to Batch"))
+
+
 def _save_channel_niche():
     """Persist the account's channel niche to config the moment it is edited —
     it is account-level state (like API keys), not per-session state, because
@@ -1439,6 +1452,7 @@ with step2:
             "Affiliate Disclosure",
             "Save Share Prompts",
             "Performance Review",
+            "Content Calendar",
         ]
         social_view = st.selectbox(
             tr("Choose a Copy Tool"),
@@ -1791,6 +1805,66 @@ with step2:
                     st.caption(tr("Performance Review Use Hint"))
                 elif "performance_insights" in st.session_state:
                     st.info(tr("No Performance Insights"))
+
+        # Niche content calendar — plans consecutive days of video subjects
+        # locked to the account's single niche (daily consistency is the
+        # strongest revenue driver) and pours them straight into batch mode,
+        # so "what do I post this week?" becomes plan → render in two clicks.
+        if social_view == "Content Calendar":
+            with st.container(border=True):
+                st.write(tr("Content Calendar"))
+                st.caption(tr("Content Calendar Hint"))
+                calendar_niche = (channel_niche or params.video_subject or "").strip()
+                if channel_niche:
+                    st.caption(
+                        f'{tr("Anchored to Channel Niche")}: **{channel_niche}**'
+                    )
+                calendar_days = st.slider(
+                    tr("Number of Days"),
+                    min_value=3,
+                    max_value=llm.MAX_CALENDAR_DAY_COUNT,
+                    value=llm.DEFAULT_CALENDAR_DAY_COUNT,
+                    key="calendar_days",
+                )
+                if st.button(
+                    tr("Generate Content Calendar"),
+                    key="auto_generate_content_calendar",
+                ):
+                    if not calendar_niche:
+                        st.error(tr("Calendar Needs Niche"))
+                    else:
+                        with st.spinner(tr("Generating Content Calendar")):
+                            st.session_state["content_calendar"] = llm.generate_content_calendar(
+                                niche=calendar_niche,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=calendar_days,
+                            )
+
+                content_calendar = st.session_state.get("content_calendar") or []
+                if content_calendar:
+                    for i, item in enumerate(content_calendar):
+                        with st.expander(
+                            f"📅 {item.get('day', '')}: {item.get('subject', '')}",
+                            expanded=(i == 0),
+                        ):
+                            render_detail_fields(
+                                item,
+                                [
+                                    ("angle", "Video Angle"),
+                                    ("goal", "Calendar Goal"),
+                                ],
+                            )
+                    st.button(
+                        f"📦 {tr('Send Ideas to Batch')}",
+                        key="send_calendar_to_batch",
+                        help=tr("Send Ideas to Batch Help"),
+                        on_click=_send_calendar_to_batch,
+                    )
+                elif "content_calendar" in st.session_state:
+                    st.info(tr("No Content Calendar"))
 
     with toolkit_tabs[2]:
         # Trending-sound helper. Music choice strongly affects a TikTok's reach, but

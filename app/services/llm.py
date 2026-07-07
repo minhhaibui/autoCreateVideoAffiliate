@@ -2271,6 +2271,82 @@ The creator pasted the stats of their OWN recent affiliate videos below (one vid
     return insights[:amount]
 
 
+DEFAULT_CALENDAR_DAY_COUNT = 7
+MAX_CALENDAR_DAY_COUNT = 14
+MAX_CALENDAR_FIELD_LENGTH = 300
+
+CALENDAR_KEYS = ("day", "subject", "angle", "goal")
+
+
+def generate_content_calendar(
+    niche: str,
+    language: str = "",
+    amount: int = DEFAULT_CALENDAR_DAY_COUNT,
+) -> List[dict]:
+    """Plan ``amount`` consecutive days of video SUBJECTS for one affiliate
+    account locked to a single niche — daily consistency is the strongest
+    revenue driver, and this feeds the batch renderer directly (each
+    ``subject`` must stand alone as a video topic). Every day stays inside
+    the niche (the one-niche-per-account strategy) while rotating proven
+    affiliate formats and mixing reach / trust / conversion goals so the
+    account is not seven hard-sells in a row.
+
+    Returns a list of dicts with the keys in CALENDAR_KEYS (day, subject,
+    angle, goal). On repeated failure an empty list is returned so the
+    caller can show a friendly message rather than crash.
+    """
+    amount = _clamp_count(
+        amount, DEFAULT_CALENDAR_DAY_COUNT, MAX_CALENDAR_DAY_COUNT
+    )
+    niche = (niche or "").strip()
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "subject", "angle" and "goal" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the niche."
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Content Planner
+
+## Goals:
+Plan {amount} consecutive days of short-video subjects for ONE TikTok affiliate account whose channel niche is: {niche}. The creator will render one video per day straight from these subjects.
+
+## Important:
+1. every single day must stay INSIDE this niche — never drift to another product category; vary the products and angles WITHIN it instead.
+2. each "subject" must be a concrete, self-contained video topic (a full video can be generated from that one line alone — no "part 2 of yesterday" dependencies).
+3. rotate proven affiliate formats across the days: honest review, before/after or demo, top-N comparison, common mistake to avoid, how-to, myth-busting, buyer FAQ/objection.
+4. mix the goals across the week: some days for reach (broad, curiosity-driven), some for trust (educate, no hard sell), some for conversion (product-focused with a clear reason to buy) — not {amount} hard-sells in a row.
+5. be honest: no invented statistics, fake scarcity or miracle claims in any subject.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "day", "subject", "angle", "goal".
+   - "day": "Day 1" ... "Day {amount}" in order.
+   - "subject": the ready-to-use video subject line.
+   - "angle": the format used that day (review, before/after, top-N, ...).
+   - "goal": reach, trust or conversion — plus a few words on why that day.
+3. {language_line}
+4. return exactly {amount} objects, one per day, each subject clearly different from the others.
+
+## Output Example:
+[{{"day": "Day 1", "subject": "...", "angle": "...", "goal": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating content calendar: niche={niche!r}, amount={amount}, "
+        f"language={language!r}"
+    )
+
+    days = _generate_json_object_list(
+        prompt,
+        lambda x: _coerce_keyed_dict(x, CALENDAR_KEYS, ("subject",), MAX_CALENDAR_FIELD_LENGTH),
+        "content calendar",
+    )
+    return days[:amount]
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(

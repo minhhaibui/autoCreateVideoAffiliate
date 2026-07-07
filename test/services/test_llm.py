@@ -1649,6 +1649,73 @@ class TestPerformanceReview(unittest.TestCase):
             )
 
 
+class TestContentCalendar(unittest.TestCase):
+    """Lịch nội dung theo ngách (day/subject/angle/goal), đổ được vào batch."""
+
+    def test_generate_content_calendar_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "day": "Day 1",
+                    "subject": "Review chân thực nồi chiên không dầu 5L",
+                    "angle": "honest review",
+                    "goal": "trust",
+                },
+                {
+                    "day": "Day 2",
+                    "subject": "3 sai lầm khi dùng nồi chiên không dầu",
+                    "angle": "common mistakes",
+                    "goal": "reach",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            days = llm.generate_content_calendar(niche="đồ gia dụng bếp")
+
+        self.assertEqual(len(days), 2)
+        self.assertEqual(days[0]["day"], "Day 1")
+        for item in days:
+            self.assertEqual(set(item.keys()), set(llm.CALENDAR_KEYS))
+
+    def test_generate_content_calendar_drops_items_without_subject(self):
+        payload = json.dumps(
+            [
+                {"day": "Day 1", "angle": "no subject", "goal": "dropped"},
+                "not a dict",
+                {"subject": "Only this survives"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            days = llm.generate_content_calendar(niche="đồ bếp")
+
+        self.assertEqual(len(days), 1)
+        self.assertEqual(days[0]["subject"], "Only this survives")
+
+    def test_generate_content_calendar_embeds_niche_and_rules_in_prompt(self):
+        with patch.object(llm, "_generate_response", return_value="[]") as mocked:
+            llm.generate_content_calendar(niche="đồ gia dụng bếp", amount=5)
+
+        prompt = mocked.call_args[0][0]
+        self.assertIn("đồ gia dụng bếp", prompt)
+        self.assertIn("5 consecutive days", prompt)
+        self.assertIn("INSIDE this niche", prompt)
+        self.assertIn("no invented statistics", prompt)
+
+    def test_generate_content_calendar_clamps_amount(self):
+        with patch.object(llm, "_generate_response", return_value="[]") as mocked:
+            llm.generate_content_calendar(niche="x", amount=999)
+        self.assertIn(
+            f"{llm.MAX_CALENDAR_DAY_COUNT} consecutive days",
+            mocked.call_args[0][0],
+        )
+
+    def test_generate_content_calendar_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(llm.generate_content_calendar(niche="x"), [])
+
+
 class TestScriptVariants(unittest.TestCase):
     """A/B full-script variant generation (reuses generate_script per variant)."""
 
