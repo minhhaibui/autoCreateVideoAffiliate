@@ -76,6 +76,37 @@ def parse_batch_items(text, max_items=MAX_BATCH_ITEMS):
     return items[:max_items]
 
 
+def append_ideas_to_batch(existing_text, ideas):
+    """Append product-idea names to the batch textarea's text, one per line.
+
+    ``ideas`` is generate_product_ideas' list of dicts; only each idea's
+    ``product`` name is taken — ideas carry no real price/code/link, and
+    inventing them would break the verbatim-campaign rule, so the extras
+    columns are left for the user. ``|`` in a name would split into extras
+    on parse, so it is flattened to a space. Names already present in
+    ``existing_text`` (as parse_batch_items sees them, case-insensitively)
+    or repeated within ``ideas`` are skipped; the existing text is kept
+    verbatim. Returns the merged text.
+    """
+    # max_items=None: dedupe against every existing line, not just the capped
+    # first MAX_BATCH_ITEMS (the cap re-applies at render time anyway).
+    seen = {
+        item["subject"].casefold()
+        for item in parse_batch_items(existing_text, max_items=None)
+    }
+    new_lines = []
+    for idea in ideas or []:
+        product = " ".join(((idea or {}).get("product") or "").replace("|", " ").split())
+        if not product or product.casefold() in seen:
+            continue
+        seen.add(product.casefold())
+        new_lines.append(product)
+    existing = (existing_text or "").rstrip()
+    if not new_lines:
+        return existing
+    return (existing + "\n" if existing else "") + "\n".join(new_lines)
+
+
 def has_batch_extras(item):
     """True when a batch item carries any per-line campaign field."""
     return any(item.get(field) for field in BATCH_EXTRA_FIELDS)

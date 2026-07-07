@@ -131,6 +131,58 @@ class TestParseBatchItems(unittest.TestCase):
         )
 
 
+class TestAppendIdeasToBatch(unittest.TestCase):
+    def test_appends_products_to_empty_text(self):
+        ideas = [{"product": "Máy hút bụi mini"}, {"product": "Son dưỡng môi"}]
+        self.assertEqual(
+            batch.append_ideas_to_batch("", ideas),
+            "Máy hút bụi mini\nSon dưỡng môi",
+        )
+
+    def test_keeps_existing_text_verbatim_and_appends_below(self):
+        existing = "1. Bình giữ nhiệt | 199k | https://s.net/a\n"
+        merged = batch.append_ideas_to_batch(existing, [{"product": "Son dưỡng môi"}])
+        self.assertEqual(
+            merged, "1. Bình giữ nhiệt | 199k | https://s.net/a\nSon dưỡng môi"
+        )
+
+    def test_dedupes_against_existing_subjects_case_insensitively(self):
+        # the existing line carries extras — dedupe must match its SUBJECT
+        existing = "son dưỡng môi | 99k | CODE9"
+        merged = batch.append_ideas_to_batch(
+            existing, [{"product": "Son Dưỡng Môi"}, {"product": "Kẹp tóc"}]
+        )
+        self.assertEqual(merged, "son dưỡng môi | 99k | CODE9\nKẹp tóc")
+
+    def test_dedupes_within_ideas_and_skips_blank_products(self):
+        ideas = [
+            {"product": "Kẹp tóc"},
+            {"product": "kẹp tóc"},
+            {"product": ""},
+            {},
+            None,
+            {"product": "   "},
+        ]
+        self.assertEqual(batch.append_ideas_to_batch(None, ideas), "Kẹp tóc")
+
+    def test_flattens_pipes_so_names_never_become_extras(self):
+        merged = batch.append_ideas_to_batch("", [{"product": "Combo 2|1 khăn giấy"}])
+        self.assertEqual(merged, "Combo 2 1 khăn giấy")
+        self.assertEqual(
+            batch.parse_batch_items(merged)[0]["subject"], "Combo 2 1 khăn giấy"
+        )
+
+    def test_nothing_new_returns_existing_unchanged_sans_trailing_newline(self):
+        self.assertEqual(batch.append_ideas_to_batch("Kẹp tóc\n", [{"product": "kẹp tóc"}]), "Kẹp tóc")
+        self.assertEqual(batch.append_ideas_to_batch("", []), "")
+
+    def test_dedupes_beyond_the_batch_cap(self):
+        # 12 existing lines > MAX_BATCH_ITEMS: line 12 must still block a dupe
+        existing = "\n".join(f"Sản phẩm {i}" for i in range(1, 13))
+        merged = batch.append_ideas_to_batch(existing, [{"product": "sản phẩm 12"}])
+        self.assertEqual(merged, existing)
+
+
 class TestFormatBatchCopy(unittest.TestCase):
     def test_full_bundle(self):
         block = batch.format_batch_copy(

@@ -28,6 +28,7 @@ from app.services import llm, voice
 from app.services import task as tm
 from app.services.batch import (
     MAX_BATCH_ITEMS,
+    append_ideas_to_batch,
     format_batch_copy,
     has_batch_extras,
     parse_batch_items,
@@ -397,6 +398,17 @@ def _use_script_variant(index):
     variants = st.session_state.get("script_variants") or []
     if 0 <= index < len(variants):
         st.session_state["video_script"] = variants[index]
+
+
+def _send_ideas_to_batch():
+    """on_click callback: pour every suggested product idea into the Batch Mode
+    textarea (one name per line, deduped against what's already there). Set in
+    a callback so the keyed textarea picks the value up on the next rerun."""
+    st.session_state["batch_subjects"] = append_ideas_to_batch(
+        st.session_state.get("batch_subjects", ""),
+        st.session_state.get("product_ideas") or [],
+    )
+    st.toast(tr("Ideas Sent to Batch"))
 
 
 def _save_channel_niche():
@@ -982,6 +994,12 @@ with step1:
                     ):
                         st.session_state["video_subject"] = idea.get("product", "")
                         st.rerun()
+            st.button(
+                f"📦 {tr('Send Ideas to Batch')}",
+                key="send_ideas_to_batch",
+                help=tr("Send Ideas to Batch Help"),
+                on_click=_send_ideas_to_batch,
+            )
         elif "product_ideas" in st.session_state:
             st.info(tr("No Product Ideas"))
 
