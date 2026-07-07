@@ -55,9 +55,13 @@ Chỉ cần cung cấp một <b>chủ đề</b> hoặc <b>từ khóa</b> cho vid
 
 Ngoài việc tạo video, WebUI còn có một bộ công cụ giúp **bán hàng affiliate trên TikTok** hiệu quả hơn. Tất cả đều dùng chung mô hình AI bạn đã cấu hình (không cần API mới) và xoay quanh một nguyên tắc cốt lõi: **link affiliate, mã giảm giá và giá tiền luôn được giữ nguyên văn (verbatim), không bao giờ đi qua AI** để tránh sai lệch.
 
+**🎯 Ngách của kênh (1 ngách / 1 tài khoản)**
+- Đặt **ngách cố định cho tài khoản** ở Bước 1 (lưu vào cấu hình) — tìm ý tưởng, caption, hashtag và lịch nội dung đều tự bám theo ngách, tránh lệch chủ đề làm giảm tiếp cận.
+
 **✍️ Kịch bản & nội dung**
-- **Tìm ý tưởng sản phẩm** affiliate theo chủ đề.
-- **Preset kịch bản theo ngành** với cấu trúc đã được chứng minh chuyển đổi cao: TikTok Affiliate (chung), Làm đẹp (Trước & Sau), Nhà cửa (Lột xác), Thời trang (Phối đồ).
+- **Tìm ý tưởng sản phẩm** affiliate theo chủ đề hoặc theo ngách của kênh, ưu tiên vùng giá dễ chốt đơn từ video ngắn.
+- **Lịch nội dung** — lên kế hoạch 3–14 ngày chủ đề video liên tiếp trong đúng ngách, xoay vòng dạng nội dung (review / trước-sau / top-N / sai lầm / hướng dẫn) và trộn ngày kéo tiếp cận – xây niềm tin – chốt đơn; một nút gửi cả tuần sang Chế độ hàng loạt.
+- **Preset kịch bản theo ngành** với cấu trúc đã được chứng minh chuyển đổi cao: TikTok Affiliate (chung), Làm đẹp (Trước & Sau), Nhà cửa (Lột xác), Thời trang (Phối đồ), Vòng lặp liền mạch (câu rewatch).
 - **Biến thể kịch bản A/B** — tạo nhiều kịch bản đầy đủ với cách mở đầu khác nhau để test, rồi nạp bản ưng ý vào ô script.
 - **Hook (câu mở đầu)** — tạo nhiều hook chặn-lướt, một chạm để chèn vào đầu kịch bản.
 - **Ước tính độ dài video** & **shot list / storyboard** chia cảnh.
@@ -70,10 +74,13 @@ Ngoài việc tạo video, WebUI còn có một bộ công cụ giúp **bán hà
 
 **📣 Copy & tăng tiếp cận**
 - **Câu kêu Lưu / Chia sẻ** — tận dụng việc lưu & chia sẻ được thuật toán ưu tiên hơn lượt thích.
-- **Caption & hashtag**, **trả lời bình luận**, **comment ghim**, **dòng công bố (disclosure)** minh bạch.
+- **Caption & hashtag chuẩn tìm kiếm** — title và caption viết theo cụm từ người mua sẽ tìm trên TikTok (search là tín hiệu xếp hạng), **trả lời bình luận**, **comment ghim**, **dòng công bố (disclosure)** minh bạch.
 - **Gợi ý nhạc trending**, **sticker chữ & CTA**, **chữ cho ảnh bìa/thumbnail**, **khung giờ đăng**.
+- **Đánh giá hiệu suất** — dán số liệu các video đã đăng (view, lượt lưu, đơn hàng…), AI chỉ ra mẫu nào đang chuyển đổi tốt để nhân bản; chỉ phân tích đúng số bạn dán, không bịa benchmark.
 
-**📦 Xuất bản**
+**📦 Sản xuất hàng loạt & Xuất bản**
+- **Chế độ hàng loạt** — dán danh sách sản phẩm (mỗi dòng một sản phẩm, kèm tùy chọn `| giá | mã | link`), app render lần lượt từng video với kịch bản riêng; kèm báo cáo tải về `.txt` và tùy chọn tự tạo caption + comment ghim cho từng video.
+- **Một chạm đổ vào hàng loạt** — gửi thẳng danh sách ý tưởng sản phẩm hoặc lịch nội dung tuần sang ô hàng loạt, không cần gõ lại.
 - **Export Copy** — gom toàn bộ nội dung đã tạo (kịch bản, hook, campaign, caption, lịch đăng…) thành một file `.txt` để dùng lại.
 
 > Giao diện được tổ chức thành 3 bước: ① Sản phẩm & Kịch bản → ② Copy & Tài sản → ③ Video & Phụ đề. Hỗ trợ đa ngôn ngữ (Việt / English / Русский).
