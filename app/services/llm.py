@@ -1127,7 +1127,7 @@ def build_social_metadata_prompt(
     # Affiliate accounts run ONE niche (topical authority); when the caller
     # passes it, the copy must stay in that lane and carry niche-level hashtags.
     niche_instruction = (
-        f'\n7. The account posts ONLY about this niche: "{niche}". Keep the title and caption voice consistent with it, and make at least 2 hashtags niche-level (about the niche itself, not just this product).'
+        f'\n8. The account posts ONLY about this niche: "{niche}". Keep the title and caption voice consistent with it, and make at least 2 hashtags niche-level (about the niche itself, not just this product).'
         if niche
         else ""
     )
@@ -1144,7 +1144,8 @@ Write engaging publishing metadata for a short video that will be posted on {lab
 3. "title": a catchy hook, at most {spec['title_max']} characters.
 4. "caption": an engaging description that ends with a call to action, at most {spec['caption_max']} characters. Do not put hashtags inside the caption.
 5. "hashtags": a JSON array of exactly {spec['hashtag_count']} strings. Each must start with "#", contain no spaces, and be relevant to the topic and to {label}.
-6. {language_instruction}{niche_instruction}
+6. {language_instruction}
+7. Search is a ranking signal: phrase the title and the caption's first sentence the way a buyer would actually SEARCH for this product (natural keyword phrases, not keyword stuffing), and mix product-specific search-term hashtags with broader ones.{niche_instruction}
 
 ## Output Example
 {{"title":"...","caption":"...","hashtags":["#example","#video"]}}
@@ -1358,6 +1359,7 @@ Suggest {amount} product ideas that tend to sell well for TikTok affiliate marke
 1. these are AI suggestions based on general TikTok / short-video commerce trends, not real-time sales numbers.
 2. prefer affordable, visually demonstrable, impulse-buy friendly products that perform well in short videos.
 3. avoid restricted or risky categories (weapons, drugs, adult products, medical or financial guarantees, counterfeits).
+4. prefer impulse-buy price points for the market — low-to-mid priced products convert several times better from a short affiliate video than high-ticket ones, so only suggest an expensive product when it has an unusually strong angle.
 
 ## Constrains:
 1. return ONLY a json-array of objects. do not return any text before or after the json.

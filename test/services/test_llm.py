@@ -725,6 +725,14 @@ class TestSocialMetadata(unittest.TestCase):
 
         self.assertNotIn("niche", prompt.lower())
 
+    def test_build_prompt_requires_search_phrasing(self):
+        """TikTok SEO 2026: search là tín hiệu xếp hạng — prompt phải bắt
+        title/caption dùng cụm từ người mua sẽ tìm kiếm."""
+        prompt = llm.build_social_metadata_prompt(video_subject="mini blender")
+
+        self.assertIn("SEARCH for this product", prompt)
+        self.assertIn("not keyword stuffing", prompt)
+
     def test_normalize_hashtags_from_string_dedupes_and_clamps(self):
         tags = llm._normalize_hashtags("#fyp fyp, trending #Trending viral", count=2)
 
@@ -1009,6 +1017,16 @@ class TestProductIdeas(unittest.TestCase):
         self.assertEqual(ideas[0]["product"], "mini blender")
         for idea in ideas:
             self.assertEqual(set(idea.keys()), set(llm.PRODUCT_IDEA_KEYS))
+
+    def test_generate_product_ideas_prompt_prefers_impulse_price_points(self):
+        """Vùng giá chuyển đổi: prompt phải hướng gợi ý về hàng giá thấp/tầm
+        trung (impulse-buy) thay vì hàng đắt tiền khó chốt từ video ngắn."""
+        with patch.object(llm, "_generate_response", return_value="[]") as mocked:
+            llm.generate_product_ideas(category="gadgets", market="Vietnam")
+
+        prompt = mocked.call_args[0][0]
+        self.assertIn("impulse-buy price points", prompt)
+        self.assertIn("high-ticket", prompt)
 
     def test_generate_product_ideas_drops_items_without_product(self):
         payload = json.dumps(
