@@ -1502,6 +1502,70 @@ class TestDisclosureLines(unittest.TestCase):
             self.assertEqual(llm.generate_disclosure_lines(video_subject="x"), [])
 
 
+class TestBuyerQA(unittest.TestCase):
+    """Buyer Q&A — comment questions that decide a purchase + paste-ready replies."""
+
+    def test_generate_buyer_qa_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "question": "Có mã giảm không shop?",
+                    "reply": "Có nha, mã đang nằm ngay giỏ hàng, bạn bấm link ghim là thấy!",
+                    "goal": "giá / khuyến mãi",
+                },
+                {
+                    "question": "Ship về tỉnh mất bao lâu?",
+                    "reply": "Đơn của mình về tỉnh thường 2-4 ngày, có hỗ trợ kiểm tra hàng nha.",
+                    "goal": "vận chuyển",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            qa = llm.generate_buyer_qa(
+                video_subject="máy xay sinh tố mini", language="Vietnamese"
+            )
+
+        self.assertEqual(len(qa), 2)
+        self.assertEqual(qa[0]["goal"], "giá / khuyến mãi")
+        for item in qa:
+            self.assertEqual(set(item.keys()), set(llm.BUYER_QA_KEYS))
+
+    def test_generate_buyer_qa_drops_items_missing_question_or_reply(self):
+        payload = json.dumps(
+            [
+                {"question": "Ship bao lâu?"},
+                {"reply": "2 ngày nha"},
+                "not a dict",
+                {"question": "Có bền không?", "reply": "Mình dùng 3 tháng vẫn ổn nha."},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            qa = llm.generate_buyer_qa(video_subject="x")
+
+        self.assertEqual(len(qa), 1)
+        self.assertEqual(qa[0]["question"], "Có bền không?")
+
+    def test_prompt_embeds_subject_honesty_rule_and_language(self):
+        with patch.object(llm, "_generate_response", return_value="[]") as mocked:
+            llm.generate_buyer_qa(
+                video_subject="máy xay sinh tố mini", language="Vietnamese", amount=4
+            )
+        prompt = mocked.call_args[0][0]
+        self.assertIn("máy xay sinh tố mini", prompt)
+        self.assertIn("must NOT invent specifics", prompt)
+        self.assertIn("Vietnamese", prompt)
+        self.assertIn("4", prompt)
+
+    def test_generate_buyer_qa_clamps_amount(self):
+        self.assertEqual(
+            llm._clamp_count(999, llm.DEFAULT_BUYER_QA_COUNT, llm.MAX_BUYER_QA_COUNT),
+            llm.MAX_BUYER_QA_COUNT,
+        )
+        self.assertEqual(
+            llm._clamp_count(0, llm.DEFAULT_BUYER_QA_COUNT, llm.MAX_BUYER_QA_COUNT), 1
+        )
+
+
 class TestSaveSharePrompts(unittest.TestCase):
     """Save / Share reach-lever prompt generation."""
 

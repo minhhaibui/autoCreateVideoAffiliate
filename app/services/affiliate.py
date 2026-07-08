@@ -31,6 +31,7 @@ def build_affiliate_package_text(
     pinned_comments=None,
     disclosure_lines=None,
     save_share_prompts=None,
+    buyer_qa=None,
     campaign=None,
 ):
     """Assemble all generated affiliate assets into one plain-text document the
@@ -167,5 +168,16 @@ def build_affiliate_package_text(
                 parts.append(f"   {label('save_share_why')}: {item['why']}")
             blocks.append("\n".join(parts))
         section(label("save_share"), "\n".join(blocks))
+
+    if buyer_qa:
+        blocks = []
+        for i, item in enumerate(buyer_qa):
+            parts = [f"{i + 1}. {item.get('question', '')}".rstrip()]
+            if item.get("reply"):
+                parts.append(f"   {label('buyer_qa_reply')}: {item['reply']}")
+            if item.get("goal"):
+                parts.append(f"   {label('buyer_qa_goal')}: {item['goal']}")
+            blocks.append("\n".join(parts))
+        section(label("buyer_qa"), "\n".join(blocks))
 
     return "\n".join(lines).strip() + "\n"

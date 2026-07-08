@@ -1451,6 +1451,7 @@ with step2:
             "Pinned Comment",
             "Affiliate Disclosure",
             "Save Share Prompts",
+            "Buyer QA",
             "Performance Review",
             "Content Calendar",
         ]
@@ -1748,6 +1749,53 @@ with step2:
                     st.caption(tr("Save Share Use Hint"))
                 elif "save_share_prompts" in st.session_state:
                     st.info(tr("No Save Prompts"))
+
+        # Buyer Q&A — 2026 social-commerce research: buyers ask about deals,
+        # shipping, authenticity and returns BEFORE ordering, and whoever
+        # answers fastest closes the sale. Pre-draft the answers so each is
+        # one paste away the moment the comments start.
+        if social_view == "Buyer QA":
+            with st.container(border=True):
+                st.write(tr("Buyer QA"))
+                st.caption(tr("Buyer QA Hint"))
+                buyer_qa_amount = st.slider(
+                    tr("Number of Buyer Questions"),
+                    min_value=1,
+                    max_value=llm.MAX_BUYER_QA_COUNT,
+                    value=llm.DEFAULT_BUYER_QA_COUNT,
+                    key="buyer_qa_amount",
+                )
+                if st.button(tr("Generate Buyer QA"), key="auto_generate_buyer_qa"):
+                    if not params.video_subject:
+                        st.error(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Buyer QA")):
+                            st.session_state["buyer_qa"] = llm.generate_buyer_qa(
+                                video_subject=params.video_subject,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=buyer_qa_amount,
+                            )
+
+                buyer_qa_items = st.session_state.get("buyer_qa") or []
+                if buyer_qa_items:
+                    for i, item in enumerate(buyer_qa_items):
+                        with st.expander(
+                            f"💬 {item.get('question', '')}",
+                            expanded=(i == 0),
+                        ):
+                            render_detail_fields(
+                                item,
+                                [
+                                    ("reply", "Buyer QA Reply"),
+                                    ("goal", "Buyer QA Goal"),
+                                ],
+                            )
+                    st.caption(tr("Buyer QA Use Hint"))
+                elif "buyer_qa" in st.session_state:
+                    st.info(tr("No Buyer QA"))
 
         # Performance review — the post-publish half of the loop. Every other
         # tool here works BEFORE posting; the 2026 playbook is publish → read
@@ -2060,6 +2108,9 @@ with step2:
                 "save_share_signal": tr("Save Share Signal"),
                 "save_share_placement": tr("Save Share Placement"),
                 "save_share_why": tr("Save Share Why"),
+                "buyer_qa": tr("Buyer QA"),
+                "buyer_qa_reply": tr("Buyer QA Reply"),
+                "buyer_qa_goal": tr("Buyer QA Goal"),
             }
             # Source the script, keywords and hooks from the live widgets the user
             # actually edits (the unkeyed script/keywords boxes are read back via
@@ -2084,6 +2135,7 @@ with step2:
                 pinned_comments=st.session_state.get("pinned_comments") or [],
                 disclosure_lines=st.session_state.get("disclosure_lines") or [],
                 save_share_prompts=st.session_state.get("save_share_prompts") or [],
+                buyer_qa=st.session_state.get("buyer_qa") or [],
                 campaign=_campaign_values(),
                 label=lambda key: _section_labels.get(key, _campaign_label(key)),
             )

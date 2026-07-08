@@ -2269,6 +2269,84 @@ Write {amount} short calls that make a viewer want to SAVE or SHARE a short affi
     return prompts[:amount]
 
 
+DEFAULT_BUYER_QA_COUNT = 5
+MAX_BUYER_QA_COUNT = 8
+MAX_BUYER_QA_FIELD_LENGTH = 300
+
+BUYER_QA_KEYS = ("question", "reply", "goal")
+
+
+def generate_buyer_qa(
+    video_subject: str,
+    language: str = "",
+    amount: int = DEFAULT_BUYER_QA_COUNT,
+) -> List[dict]:
+    """Anticipate the comment-section questions that decide a purchase and
+    draft a paste-ready reply for each. 2026 social-commerce research:
+    short-video buyers ask about deals, shipping, authenticity/quality and
+    returns BEFORE ordering, and the sellers who answer fastest close the
+    order — so having the answers ready the moment the video goes up is a
+    direct conversion lever.
+
+    Returns a list of dicts with the keys in BUYER_QA_KEYS (question, reply,
+    goal). ``question`` is the likely buyer comment, ``reply`` the creator's
+    ready-to-paste answer, ``goal`` the purchase blocker it clears. Replies
+    follow the toolkit honesty rule: no invented prices, codes, shipping fees
+    or warranty terms. On repeated failure an empty list is returned so the
+    caller can show a friendly message rather than crash.
+    """
+    amount = _clamp_count(amount, DEFAULT_BUYER_QA_COUNT, MAX_BUYER_QA_COUNT)
+    video_subject = _limit_social_text(
+        video_subject, MAX_SOCIAL_SUBJECT_LENGTH, "video_subject"
+    )
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "question", "reply" and "goal" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the subject."
+    )
+
+    prompt = f"""
+# Role: Short-Video Commerce Comment Closer
+
+## Goals:
+A creator is about to publish a short affiliate video about "{video_subject}". Predict the {amount} comment-section questions MOST likely to decide whether a viewer buys, and write a ready-to-paste reply for each. Buyers who get a fast, confident answer order; buyers left waiting scroll on.
+
+## Important:
+1. pick real PURCHASE BLOCKERS for this exact product — typical blockers are deals/price ("có mã giảm không?"-type), shipping/COD, authenticity or quality/durability, how-to-use or fit/size, and returns/warranty. Choose the ones that actually apply to "{video_subject}".
+2. phrase each "question" the way a real casual buyer comments — short, informal, no marketing voice.
+3. each "reply" is 1-2 short sentences, friendly and confident, and must NOT invent specifics the creator never stated: no made-up prices, discount codes, shipping fees, stock counts or warranty lengths. When a number is needed, point to where the buyer can check it (e.g. the cart page, the pinned link) instead of inventing one.
+4. never bad-mouth other products or make medical/absolute claims.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "question", "reply", "goal".
+   - "question": the likely buyer comment.
+   - "reply": the creator's ready-to-paste answer.
+   - "goal": the purchase blocker this clears, in a few words.
+3. {language_line}
+4. the {amount} questions must target clearly different blockers — no two rewordings of the same doubt.
+
+## Output Example:
+[{{"question": "...", "reply": "...", "goal": "..."}}]
+""".strip()
+
+    logger.info(
+        f"generating buyer q&a: subject={video_subject!r}, amount={amount}, "
+        f"language={language!r}"
+    )
+
+    qa = _generate_json_object_list(
+        prompt,
+        lambda x: _coerce_keyed_dict(
+            x, BUYER_QA_KEYS, ("question", "reply"), MAX_BUYER_QA_FIELD_LENGTH
+        ),
+        "buyer q&a",
+    )
+    return qa[:amount]
+
+
 DEFAULT_PERFORMANCE_INSIGHT_COUNT = 4
 MAX_PERFORMANCE_INSIGHT_COUNT = 8
 MAX_PERFORMANCE_FIELD_LENGTH = 400

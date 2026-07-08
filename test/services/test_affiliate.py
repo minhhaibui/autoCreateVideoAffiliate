@@ -192,6 +192,25 @@ class TestBuildAffiliatePackageText(unittest.TestCase):
         self.assertNotIn("save_share_placement:", out)
         self.assertNotIn("save_share_why:", out)
 
+    def test_buyer_qa_section(self):
+        qa = [
+            {
+                "question": "Có mã giảm không shop?",
+                "reply": "Mã nằm ngay giỏ hàng nha!",
+                "goal": "giá / khuyến mãi",
+            }
+        ]
+        out = _build(buyer_qa=qa)
+        self.assertIn("1. Có mã giảm không shop?", out)
+        self.assertIn("buyer_qa_reply: Mã nằm ngay giỏ hàng nha!", out)
+        self.assertIn("buyer_qa_goal: giá / khuyến mãi", out)
+
+    def test_buyer_qa_omits_missing_subfields(self):
+        out = _build(buyer_qa=[{"question": "Ship bao lâu?"}])
+        self.assertIn("1. Ship bao lâu?", out)
+        self.assertNotIn("buyer_qa_reply:", out)
+        self.assertNotIn("buyer_qa_goal:", out)
+
     def test_label_callable_translates_headings(self):
         out = build_affiliate_package_text(
             subject="X",
