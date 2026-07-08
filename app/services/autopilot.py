@@ -42,6 +42,33 @@ LLM_COOLDOWN_SECONDS = 30
 QUOTA_RETRY_WAIT_SECONDS = 70
 PICK_ATTEMPTS = 3
 
+# Waiting only helps the per-MINUTE window; the free tier also has a
+# per-DAY pool per model, and when that one is drained no wait short of
+# tomorrow fixes it. Each Gemini model has its own daily pool, so the last
+# pick attempt switches this process to a fallback model instead of failing
+# the run. config.toml on disk is never modified.
+FALLBACK_GEMINI_MODEL = "gemini-2.5-flash-lite"
+
+
+def _activate_fallback_model() -> str:
+    """Point this process at the fallback Gemini model (its own free-tier
+    quota pool). The switch is in-memory only and, because llm.py reads the
+    model name per call, it also covers every later stage of the run
+    (script, terms, publish copy). Returns the fallback model name, or ""
+    when there is nothing to switch (non-Gemini provider, or already on the
+    fallback). Override the default with ``autopilot_fallback_model`` in
+    config.toml [app]."""
+    if (config.app.get("llm_provider", "") or "").lower() != "gemini":
+        return ""
+    fallback = (
+        config.app.get("autopilot_fallback_model", "") or FALLBACK_GEMINI_MODEL
+    ).strip()
+    current = (config.app.get("gemini_model_name", "") or "").strip()
+    if not fallback or current == fallback:
+        return ""
+    config.app["gemini_model_name"] = fallback
+    return fallback
+
 
 def _cooldown(seconds: float = LLM_COOLDOWN_SECONDS) -> None:
     time.sleep(seconds)
@@ -93,6 +120,13 @@ def pick_best_product(
                 f"waiting {QUOTA_RETRY_WAIT_SECONDS}s before attempt {attempt + 1}"
             )
             _cooldown(QUOTA_RETRY_WAIT_SECONDS)
+            if attempt == PICK_ATTEMPTS - 1:
+                fallback = _activate_fallback_model()
+                if fallback:
+                    logger.warning(
+                        f"autopilot: primary model still drained after waiting — "
+                        f"switching this run to {fallback!r} (separate daily pool)"
+                    )
         ideas = [
             i
             for i in llm.generate_product_ideas(

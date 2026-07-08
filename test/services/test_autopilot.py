@@ -44,7 +44,43 @@ class TestHistory(unittest.TestCase):
             self.assertEqual(autopilot.load_history(path), [])
 
 
+class TestFallbackModel(unittest.TestCase):
+    def test_switches_gemini_to_the_fallback_in_process(self):
+        app = {"llm_provider": "gemini", "gemini_model_name": "gemini-2.5-flash"}
+        with patch.object(autopilot.config, "app", app):
+            self.assertEqual(
+                autopilot._activate_fallback_model(),
+                autopilot.FALLBACK_GEMINI_MODEL,
+            )
+            self.assertEqual(
+                app["gemini_model_name"], autopilot.FALLBACK_GEMINI_MODEL
+            )
+
+    def test_configured_fallback_name_wins_over_the_default(self):
+        app = {"llm_provider": "gemini", "gemini_model_name": "gemini-2.5-flash",
+               "autopilot_fallback_model": "gemini-x"}
+        with patch.object(autopilot.config, "app", app):
+            self.assertEqual(autopilot._activate_fallback_model(), "gemini-x")
+            self.assertEqual(app["gemini_model_name"], "gemini-x")
+
+    def test_non_gemini_provider_is_left_alone(self):
+        app = {"llm_provider": "openai", "gemini_model_name": "gemini-2.5-flash"}
+        with patch.object(autopilot.config, "app", app):
+            self.assertEqual(autopilot._activate_fallback_model(), "")
+            self.assertEqual(app["gemini_model_name"], "gemini-2.5-flash")
+
+    def test_already_on_the_fallback_switches_nothing(self):
+        app = {"llm_provider": "gemini",
+               "gemini_model_name": autopilot.FALLBACK_GEMINI_MODEL}
+        with patch.object(autopilot.config, "app", app):
+            self.assertEqual(autopilot._activate_fallback_model(), "")
+
+
+# config.app is patched to a non-Gemini provider so the last-attempt model
+# fallback stays inert (and can never mutate the real in-memory config);
+# the fallback-specific test re-patches with a Gemini dict of its own.
 @patch.object(autopilot, "_cooldown", lambda *a, **k: None)
+@patch.object(autopilot.config, "app", {"llm_provider": "none"})
 class TestPickBestProduct(unittest.TestCase):
     def test_retries_when_the_pool_comes_back_empty(self):
         """Cạn quota free-tier: lượt đầu rỗng → đợi hết cửa sổ rồi thử lại."""
@@ -62,6 +98,31 @@ class TestPickBestProduct(unittest.TestCase):
         ) as gen:
             self.assertIsNone(autopilot.pick_best_product("đồ bếp"))
         self.assertEqual(gen.call_count, autopilot.PICK_ATTEMPTS)
+
+    def test_last_attempt_switches_to_the_fallback_model_pool(self):
+        """Quota NGÀY của model chính cạn: 2 lượt rỗng → lượt cuối đổi sang
+        model dự phòng (pool quota riêng) và pick thành công."""
+        app = {"llm_provider": "gemini", "gemini_model_name": "gemini-2.5-flash"}
+        with patch.object(autopilot.config, "app", app), \
+             patch.object(llm, "generate_product_ideas",
+                          side_effect=[[], [], IDEAS]) as gen, \
+             patch.object(llm, "rank_product_ideas", return_value=[]):
+            pick = autopilot.pick_best_product("đồ bếp")
+        self.assertEqual(pick["product"], "Máy hút bụi mini")
+        self.assertEqual(gen.call_count, 3)
+        self.assertEqual(
+            app["gemini_model_name"], autopilot.FALLBACK_GEMINI_MODEL
+        )
+
+    def test_success_before_the_last_attempt_keeps_the_primary_model(self):
+        app = {"llm_provider": "gemini", "gemini_model_name": "gemini-2.5-flash"}
+        with patch.object(autopilot.config, "app", app), \
+             patch.object(llm, "generate_product_ideas",
+                          side_effect=[[], IDEAS]), \
+             patch.object(llm, "rank_product_ideas", return_value=[]):
+            pick = autopilot.pick_best_product("đồ bếp")
+        self.assertEqual(pick["product"], "Máy hút bụi mini")
+        self.assertEqual(app["gemini_model_name"], "gemini-2.5-flash")
 
     def test_ranked_winner_wins_and_carries_why(self):
         ranked = [
