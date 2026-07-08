@@ -83,6 +83,7 @@
     "New Video": "Video mới (dọn để làm sản phẩm kế tiếp)",
     "New Video Help": "Xóa chủ đề, kịch bản, từ khóa, các ô sản phẩm chiến dịch và mọi bảng nội dung đã tạo để bạn bắt đầu sản phẩm kế tiếp. Vẫn giữ ngách của kênh, shop & link, cài đặt giọng đọc/phụ đề, API key, danh sách hàng loạt và ý tưởng sản phẩm / lịch nội dung của bạn.",
     "New Video Ready": "Đã dọn sạch — sẵn sàng cho sản phẩm kế tiếp",
+    "Video Source Key Missing": "Nguồn video này cần API key. Mở Cài đặt cơ bản ở trên cùng để thêm, nếu không video sẽ lỗi ở bước cuối.",
     "Video Script and Subject Cannot Both Be Empty": "Chủ Đề Video và Kịch Bản Video không thể cùng trống",
     "LLM Key Missing Banner": "⚠️ Để dùng các công cụ AI (gợi ý sản phẩm, kịch bản và toàn bộ công cụ viết nội dung), hãy mở **Cài Đặt Cơ Bản** ở trên cùng và dán khóa API LLM của bạn.",
     "Please Enter the Video Script": "Vui lòng nhập hoặc tạo kịch bản video trước",

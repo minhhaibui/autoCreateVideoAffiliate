@@ -490,8 +490,15 @@ def get_groq_model_ids(api_key: str, base_url: str) -> list[str]:
         return []
 
 # 创建基础设置折叠框
+# Auto-open when the LLM key is missing: the mandatory API key lives in here, so
+# a collapsed panel is exactly where a first-run user can't find the thing the
+# readiness banner is warning them about. Open it precisely when it's not ready.
+_basic_provider = config.app.get("llm_provider", "openai").lower()
+_basic_key_ready = is_llm_ready(
+    _basic_provider, config.app.get(f"{_basic_provider}_api_key", "")
+)
 if not config.app.get("hide_config", False):
-    with st.expander(tr("Basic Settings"), expanded=False):
+    with st.expander(tr("Basic Settings"), expanded=not _basic_key_ready):
         config_panels = st.columns(3)
         left_config_panel = config_panels[0]
         middle_config_panel = config_panels[1]
@@ -2206,6 +2213,17 @@ with step3:
         )
         params.video_source = video_sources[selected_index][1]
         config.app["video_source"] = params.video_source
+
+        # Warn here, at the source picker, when the chosen online source has no
+        # API key — otherwise the missing key only surfaces at the final
+        # Generate click, after the whole script and copy are already done.
+        _source_key_config = {
+            "pexels": "pexels_api_keys",
+            "pixabay": "pixabay_api_keys",
+            "coverr": "coverr_api_keys",
+        }.get(params.video_source)
+        if _source_key_config and not config.app.get(_source_key_config, ""):
+            st.warning(tr("Video Source Key Missing"))
 
         if params.video_source == "local":
             # Streamlit 的文件类型校验对扩展名大小写敏感，这里同时放行大小写两种形式。
