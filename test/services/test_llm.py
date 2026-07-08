@@ -1843,5 +1843,25 @@ class TestLiteLLMLiveIntegration(unittest.TestCase):
         self.assertIn("4", result)
 
 
+class TestGenerateTerms(unittest.TestCase):
+    def test_happy_path_parses_the_json_array(self):
+        payload = json.dumps(["blender smoothie", "mini blender", "kitchen"])
+        with patch.object(llm, "_generate_response", return_value=payload):
+            terms = llm.generate_terms("Máy xay sinh tố", "script", amount=3)
+        self.assertEqual(terms, ["blender smoothie", "mini blender", "kitchen"])
+
+    def test_provider_error_returns_an_empty_list_not_the_error_text(self):
+        """Lỗi provider (vd 429) từng được trả về NGUYÊN VĂN — chuỗi truthy đó
+        lọt xuống material.download_videos và bị duyệt thành search term
+        1-ký-tự ('E', 'r', 'r'...). Contract của hàm là list: lỗi → []."""
+        with patch.object(
+            llm,
+            "_generate_response",
+            return_value="Error: 429 POST quota exceeded",
+        ):
+            terms = llm.generate_terms("Máy xay sinh tố", "script")
+        self.assertEqual(terms, [])
+
+
 if __name__ == "__main__":
     unittest.main()

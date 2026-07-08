@@ -927,8 +927,10 @@ Please note that you must use English for generating video search terms; Chinese
         try:
             response = _generate_response(prompt)
             if "Error: " in response:
-                logger.error(f"failed to generate video script: {response}")
-                return response
+                # never hand the error text back: callers expect a list, and
+                # a truthy string ends up iterated as one-character "terms"
+                logger.error(f"failed to generate video terms: {response}")
+                return []
             search_terms = json.loads(response)
             if not isinstance(search_terms, list) or not all(
                 isinstance(term, str) for term in search_terms

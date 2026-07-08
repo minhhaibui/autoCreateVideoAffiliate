@@ -45,6 +45,20 @@ class TestTaskService(unittest.TestCase):
             custom_system_prompt="Only write short narration.",
         )
     
+    def test_generate_terms_llm_error_string_fails_the_task_cleanly(self):
+        """Nếu tầng LLM vẫn trả về thứ gì đó không phải list (vd chuỗi lỗi
+        429), task phải thất bại sạch (None + state FAILED) thay vì đưa chuỗi
+        truthy đó xuống bước tải liệu."""
+        params = VideoParams(
+            video_subject="Máy xay sinh tố", video_script="", video_terms=""
+        )
+        with patch.object(
+            tm.llm, "generate_terms", return_value="Error: 429 quota exceeded"
+        ), patch.object(tm.sm.state, "update_task") as update:
+            result = tm.generate_terms("task-id", params, "script text")
+        self.assertIsNone(result)
+        update.assert_called_once()
+
     def test_task_local_materials(self):
         task_id = "00000000-0000-0000-0000-000000000000"
         video_materials=[]

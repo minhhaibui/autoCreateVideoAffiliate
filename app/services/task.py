@@ -42,6 +42,10 @@ def generate_terms(task_id, params, video_script):
         video_terms = llm.generate_terms(
             video_subject=params.video_subject, video_script=video_script, amount=5
         )
+        if not isinstance(video_terms, list):
+            # anything else (e.g. an LLM error string) would be consumed
+            # downstream as an iterable of one-character search terms
+            video_terms = []
     else:
         if isinstance(video_terms, str):
             video_terms = [term.strip() for term in re.split(r"[,，]", video_terms)]
