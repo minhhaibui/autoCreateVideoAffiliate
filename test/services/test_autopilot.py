@@ -379,6 +379,7 @@ class TestRankProductIdeas(unittest.TestCase):
         self.assertIn('"Máy hút bụi mini"', prompt)
         self.assertIn("STOCK footage", prompt)
         self.assertIn("impulse-buy price point", prompt)
+        self.assertIn("demand durability", prompt)
 
     def test_empty_ideas_short_circuit(self):
         self.assertEqual(llm.rank_product_ideas([]), [])

@@ -1439,6 +1439,7 @@ Rank the candidate products below by how likely a short TikTok AFFILIATE video w
 2. how well generic stock clips can make the benefit obvious without a live demo.
 3. how many viewers have the underlying need (broad beats narrow).
 4. how strong and concrete the stated video angle is.
+5. demand durability: prefer products people need year-round over dying fads — a spiking trend is only worth it while it still has months to live.
 
 ## Constrains:
 1. return ONLY a json-array of objects, BEST candidate first. do not return any text before or after the json.
