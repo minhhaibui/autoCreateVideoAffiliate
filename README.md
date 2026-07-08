@@ -83,6 +83,13 @@ Ngoài việc tạo video, WebUI còn có một bộ công cụ giúp **bán hà
 - **Một chạm đổ vào hàng loạt** — gửi thẳng danh sách ý tưởng sản phẩm hoặc lịch nội dung tuần sang ô hàng loạt, không cần gõ lại.
 - **Export Copy** — gom toàn bộ nội dung đã tạo (kịch bản, hook, campaign, caption, lịch đăng…) thành một file `.txt` để dùng lại.
 
+**🤖 Autopilot — tự sản xuất video theo lịch**
+- Chạy `python autopilot.py` (hoặc đặt cron) là app **tự lo trọn một chu trình**: sinh một loạt ý tưởng trong ngách của kênh → AI chấm điểm chọn sản phẩm hứa hẹn nhất (ưu tiên giá dễ chốt, minh họa được bằng video stock) → tránh lặp sản phẩm đã làm gần đây → render video → tạo sẵn caption + comment ghim → ghi tất cả vào báo cáo `autopilot_report.txt` cạnh video.
+- **Tự vượt giới hạn quota miễn phí**: chạy không người trông nên autopilot tự giãn nhịp giữa các lần gọi AI, và khi model chính cạn quota ngày sẽ **tự chuyển sang model dự phòng** (mặc định `gemini-2.5-flash-lite`, đổi bằng khóa `autopilot_fallback_model` trong `config.toml [app]`) — kể cả thử render lại một lần nếu quota cạn giữa chừng. File cấu hình trên đĩa không bao giờ bị sửa.
+- **Panel Autopilot trong WebUI** — xem các lần chạy gần nhất và tải báo cáo mới nhất ngay trong giao diện, không cần mở terminal.
+- Ví dụ cron chạy 9:00 và 21:00 hằng ngày (máy phải đang thức): `0 9,21 * * * cd /duong-dan/MoneyPrinterTurbo && .venv/bin/python autopilot.py >> storage/autopilot/cron.log 2>&1`
+- Như mọi tính năng khác: autopilot **không bao giờ bịa link affiliate** — báo cáo luôn nhắc bạn tự thêm link thật trước khi đăng.
+
 > Giao diện được tổ chức thành 3 bước: ① Sản phẩm & Kịch bản → ② Copy & Tài sản → ③ Video & Phụ đề. Hỗ trợ đa ngôn ngữ (Việt / English / Русский).
 
 ## Video demo 📺
