@@ -1400,17 +1400,24 @@ with step2:
     # clicking a Generate button and getting an error. Nudge them first.
     if not params.video_subject:
         st.info(tr("Step 2 Needs Subject"))
-    # The affiliate copy helpers are grouped into sub-tabs to stay readable.
-    # (Streamlit st.tabs still runs every panel's body each rerun and just hides
-    # the inactive ones with CSS — it's a layout aid, not lazy rendering.)
-    toolkit_tabs = st.tabs([
-        tr("Toolkit Tab Content"),
-        tr("Toolkit Tab Social"),
-        tr("Toolkit Tab On-screen"),
-        tr("Toolkit Tab Export"),
-    ])
+    # The affiliate copy helpers were sub-tabs INSIDE the wizard's Step-2 tab —
+    # tabs-in-tabs is cramped and the last row of nesting here. Flattened to a
+    # single picker (like the Social and On-screen tools already were), which
+    # also stops burying Export Copy as a 4th nested tab.
+    _toolkit_sections = {
+        "content": tr("Toolkit Tab Content"),
+        "social": tr("Toolkit Tab Social"),
+        "onscreen": tr("Toolkit Tab On-screen"),
+        "export": tr("Toolkit Tab Export"),
+    }
+    toolkit_section = st.selectbox(
+        tr("Choose a Toolkit Section"),
+        options=list(_toolkit_sections.keys()),
+        format_func=lambda k: _toolkit_sections[k],
+        key="toolkit_section",
+    )
 
-    with toolkit_tabs[0]:
+    if toolkit_section == "content":
         # Hook generator. The first ~3 seconds decide a TikTok's watch-through rate,
         # so let the user generate several A/B-testable opening lines for the current
         # subject and copy the best one into the start of their script.
@@ -1530,7 +1537,7 @@ with step2:
             elif "video_shots" in st.session_state:
                 st.info(tr("No Shots"))
 
-    with toolkit_tabs[1]:
+    if toolkit_section == "social":
         # TikTok / short-video post caption helper. Reuses the existing
         # llm.generate_social_metadata backend (already used by the REST API) so the
         # WebUI user can produce a ready-to-paste title, caption and hashtags for
@@ -2005,7 +2012,7 @@ with step2:
                 elif "content_calendar" in st.session_state:
                     st.info(tr("No Content Calendar"))
 
-    with toolkit_tabs[2]:
+    if toolkit_section == "onscreen":
         # Trending-sound helper. Music choice strongly affects a TikTok's reach, but
         # creators often don't know what to put on. This suggests sound STYLES plus a
         # keyword to search the in-app sound library (the LLM can't see live charts,
@@ -2153,7 +2160,7 @@ with step2:
                 elif "cover_ideas" in st.session_state:
                     st.info(tr("No Cover Text"))
 
-    with toolkit_tabs[3]:
+    if toolkit_section == "export":
         # Export helper: bundle every generated asset (subject, hooks, script,
         # keywords, caption, hashtags) into one text file so creators can archive
         # their copy or move it into a publishing tool in a single click.
