@@ -247,6 +247,21 @@ def run_autopilot(niche: str = "", language: str = "vi") -> dict:
     result = tm.start(task_id=task_id, params=params)
     videos = (result or {}).get("videos") or []
     if not videos:
+        # The pick can succeed on the primary model and the daily pool still
+        # drain mid-render (the script/terms calls). If the fallback model
+        # isn't active yet, switch and retry the render once — a no-op
+        # returning "" when the pick already switched, so never two retries.
+        fallback = _activate_fallback_model()
+        if fallback:
+            logger.warning(
+                f"autopilot: render failed for {subject!r} — retrying once on "
+                f"{fallback!r} in case the primary pool drained mid-run"
+            )
+            _cooldown(QUOTA_RETRY_WAIT_SECONDS)
+            task_id = utils.get_uuid()
+            result = tm.start(task_id=task_id, params=params)
+            videos = (result or {}).get("videos") or []
+    if not videos:
         return {
             "error": f"render failed for {subject!r}",
             "product": subject,

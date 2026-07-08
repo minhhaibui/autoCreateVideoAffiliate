@@ -245,6 +245,54 @@ class TestRunAutopilot(unittest.TestCase):
             history = autopilot.load_history(os.path.join(d, "history.json"))
             self.assertEqual(history[-1]["product"], "Kệ bếp đa năng")
 
+    def test_render_failure_retries_once_on_the_fallback_model(self):
+        """Pick OK trên model chính nhưng quota cạn giữa lúc render
+        (script/terms): đổi model dự phòng và render lại đúng 1 lần."""
+        with tempfile.TemporaryDirectory() as d:
+            task_dir = os.path.join(d, "task")
+            os.makedirs(task_dir, exist_ok=True)
+            good = {"videos": [os.path.join(task_dir, "final-1.mp4")]}
+            app = {"llm_provider": "gemini", "gemini_api_key": "k" * 20,
+                   "gemini_model_name": "gemini-2.5-flash",
+                   "pexels_api_keys": ["p"], "channel_niche": "đồ bếp"}
+            with patch.object(autopilot, "history_path",
+                              return_value=os.path.join(d, "history.json")), \
+                 patch.object(autopilot.utils, "task_dir",
+                              return_value=task_dir), \
+                 patch.object(autopilot, "pick_best_product",
+                              return_value={"product": "Kệ bếp", "why_best": ""}), \
+                 patch.object(autopilot.tm, "start",
+                              side_effect=[None, good]) as start, \
+                 patch.object(llm, "generate_social_metadata", return_value={}), \
+                 patch.object(llm, "generate_pinned_comments", return_value=[]), \
+                 patch.object(autopilot, "is_llm_ready", return_value=True), \
+                 patch.object(autopilot.config, "app", app):
+                result = autopilot.run_autopilot()
+            self.assertEqual(result["error"], "")
+            self.assertEqual(start.call_count, 2)
+            self.assertEqual(
+                app["gemini_model_name"], autopilot.FALLBACK_GEMINI_MODEL
+            )
+            history = autopilot.load_history(os.path.join(d, "history.json"))
+            self.assertEqual(history[-1]["product"], "Kệ bếp")
+
+    def test_no_second_retry_when_already_on_the_fallback(self):
+        """Pick đã đổi model dự phòng từ trước → render fail là fail thật,
+        không thử lại lần hai."""
+        app = {"llm_provider": "gemini", "gemini_api_key": "k" * 20,
+               "gemini_model_name": autopilot.FALLBACK_GEMINI_MODEL,
+               "pexels_api_keys": ["p"], "channel_niche": "đồ bếp"}
+        with patch.object(autopilot, "pick_best_product",
+                          return_value={"product": "Kệ bếp", "why_best": ""}), \
+             patch.object(autopilot, "history_path"), \
+             patch.object(autopilot, "load_history", return_value=[]), \
+             patch.object(autopilot.tm, "start", return_value=None) as start, \
+             patch.object(autopilot, "is_llm_ready", return_value=True), \
+             patch.object(autopilot.config, "app", app):
+            result = autopilot.run_autopilot()
+        self.assertIn("render failed", result["error"])
+        self.assertEqual(start.call_count, 1)
+
     def test_render_failure_records_nothing(self):
         with tempfile.TemporaryDirectory() as d:
             result = self._run(d, render=None)
