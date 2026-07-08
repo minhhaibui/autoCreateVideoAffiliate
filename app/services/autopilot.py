@@ -98,6 +98,34 @@ def save_history(path: str, history: list) -> None:
         json.dump(history[-HISTORY_LIMIT:], f, ensure_ascii=False, indent=2)
 
 
+def read_latest_report(history: list = None) -> dict:
+    """Newest run that still has its report on disk: walk the history from
+    the most recent entry backwards and return
+    ``{"product", "time", "report", "path"}`` — ``{}`` when there is nothing
+    to show (no runs yet, or the task folders were cleaned up). Builds paths
+    without utils.task_dir, which would mkdir folders for stale task ids."""
+    if history is None:
+        history = load_history(history_path())
+    tasks_root = utils.storage_dir("tasks")
+    for entry in reversed(history or []):
+        task_id = (entry or {}).get("task_id", "")
+        if not task_id:
+            continue
+        path = os.path.join(tasks_root, task_id, REPORT_FILENAME)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                report = f.read()
+        except OSError:
+            continue
+        return {
+            "product": entry.get("product", ""),
+            "time": entry.get("time", ""),
+            "report": report,
+            "path": path,
+        }
+    return {}
+
+
 def pick_best_product(
     niche: str,
     language: str = "vi",

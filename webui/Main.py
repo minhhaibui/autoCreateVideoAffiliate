@@ -24,7 +24,7 @@ from app.models.schema import (
     VideoParams,
     VideoTransitionMode,
 )
-from app.services import llm, voice
+from app.services import autopilot, llm, voice
 from app.services import task as tm
 from app.services.batch import (
     MAX_BATCH_ITEMS,
@@ -3074,5 +3074,29 @@ with st.expander(f"📦 {tr('Batch Mode')}", expanded=False):
             mime="text/plain",
             key="download_batch_report",
         )
+
+# Read-only window into the unattended cron pipeline: recent runs and the
+# newest report (video path + paste-ready publish copy) without a terminal.
+with st.expander(f"🤖 {tr('Autopilot Panel')}", expanded=False):
+    st.caption(tr("Autopilot Panel Hint"))
+    autopilot_history = autopilot.load_history(autopilot.history_path())
+    if not autopilot_history:
+        st.info(tr("Autopilot No Runs Yet"))
+    else:
+        for autopilot_entry in reversed(autopilot_history[-5:]):
+            st.text(
+                f"{autopilot_entry.get('time', '')} — "
+                f"{autopilot_entry.get('product', '')}"
+            )
+        latest_autopilot = autopilot.read_latest_report(autopilot_history)
+        if latest_autopilot:
+            st.code(latest_autopilot["report"])
+            st.download_button(
+                f"💾 {tr('Download Autopilot Report')}",
+                data=latest_autopilot["report"],
+                file_name="autopilot_report.txt",
+                mime="text/plain",
+                key="download_autopilot_report",
+            )
 
 config.save_config()

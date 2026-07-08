@@ -44,6 +44,52 @@ class TestHistory(unittest.TestCase):
             self.assertEqual(autopilot.load_history(path), [])
 
 
+class TestReadLatestReport(unittest.TestCase):
+    def _write_report(self, root, task_id, text):
+        os.makedirs(os.path.join(root, task_id), exist_ok=True)
+        path = os.path.join(root, task_id, autopilot.REPORT_FILENAME)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_newest_entry_with_a_report_wins(self):
+        history = [
+            {"product": "cũ", "task_id": "old-task", "time": "t1"},
+            {"product": "mới", "task_id": "new-task", "time": "t2"},
+        ]
+        with tempfile.TemporaryDirectory() as d:
+            self._write_report(d, "old-task", "old report")
+            self._write_report(d, "new-task", "new report")
+            with patch.object(autopilot.utils, "storage_dir", return_value=d):
+                latest = autopilot.read_latest_report(history)
+        self.assertEqual(latest["product"], "mới")
+        self.assertEqual(latest["report"], "new report")
+        self.assertEqual(latest["time"], "t2")
+
+    def test_missing_report_falls_back_to_an_older_run(self):
+        """Task dir đã bị dọn (hoặc run lỗi không có report) → lùi về lần
+        chạy cũ hơn còn report thay vì trả rỗng."""
+        history = [
+            {"product": "cũ", "task_id": "old-task", "time": "t1"},
+            {"product": "mới", "task_id": "cleaned-task", "time": "t2"},
+        ]
+        with tempfile.TemporaryDirectory() as d:
+            self._write_report(d, "old-task", "old report")
+            with patch.object(autopilot.utils, "storage_dir", return_value=d):
+                latest = autopilot.read_latest_report(history)
+        self.assertEqual(latest["product"], "cũ")
+
+    def test_nothing_to_show_returns_empty_dict(self):
+        with tempfile.TemporaryDirectory() as d:
+            with patch.object(autopilot.utils, "storage_dir", return_value=d):
+                self.assertEqual(autopilot.read_latest_report([]), {})
+                self.assertEqual(
+                    autopilot.read_latest_report(
+                        [{"product": "x", "task_id": "gone"}, {"no": "id"}]
+                    ),
+                    {},
+                )
+
+
 class TestFallbackModel(unittest.TestCase):
     def test_switches_gemini_to_the_fallback_in_process(self):
         app = {"llm_provider": "gemini", "gemini_model_name": "gemini-2.5-flash"}
