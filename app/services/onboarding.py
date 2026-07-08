@@ -51,6 +51,10 @@ NEW_VIDEO_TEXT_KEYS = (
     "campaign_product",
     "campaign_price",
     "campaign_code",
+    # per-product: every TikTok Shop product has its own affiliate link, so it
+    # must NOT carry over to the next video (shipping product A's link on
+    # product B's video would be the worst kind of silent error).
+    "campaign_link",
     "hook_text_input",
     "onscreen_cta_text",
     "end_card_text",
@@ -74,13 +78,13 @@ NEW_VIDEO_ASSET_KEYS = (
 )
 
 # Account-level / cross-video state that "New video" must NEVER clear: the
-# channel niche, the shop and affiliate link (retyped otherwise), the batch
-# list, and the multi-video planning tools. Listed explicitly so a unit test
-# can prove the reset leaves them alone even if new keys are added later.
+# channel niche, the shop name (one shop per account), the batch list, and the
+# multi-video planning tools. NOT the affiliate link — that is per-product and
+# is cleared above. Listed explicitly so a unit test can prove the reset leaves
+# them alone even if new keys are added later.
 NEW_VIDEO_PRESERVED_KEYS = (
     "channel_niche_input",
     "campaign_shop",
-    "campaign_link",
     "batch_subjects",
     "product_ideas",
     "content_calendar",

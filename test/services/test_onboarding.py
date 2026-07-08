@@ -68,7 +68,6 @@ class TestApplyNewVideoReset(unittest.TestCase):
             {
                 "channel_niche_input": "đồ gia dụng nhà bếp",
                 "campaign_shop": "MyShop",
-                "campaign_link": "https://shop.example/aff",
                 "batch_subjects": "SP1\nSP2",
                 "product_ideas": [{"product": "idea1"}],
                 "content_calendar": [{"subject": "day1"}],
@@ -94,11 +93,18 @@ class TestApplyNewVideoReset(unittest.TestCase):
         apply_new_video_reset(state)
         self.assertEqual(state["channel_niche_input"], "đồ gia dụng nhà bếp")
         self.assertEqual(state["campaign_shop"], "MyShop")
-        self.assertEqual(state["campaign_link"], "https://shop.example/aff")
         self.assertEqual(state["batch_subjects"], "SP1\nSP2")
         self.assertEqual(state["product_ideas"], [{"product": "idea1"}])
         self.assertEqual(state["content_calendar"], [{"subject": "day1"}])
         self.assertEqual(state["ui_language"], "vi")
+
+    def test_affiliate_link_is_cleared_because_it_is_per_product(self):
+        # Shipping product A's link on product B's video is the worst silent
+        # error — the per-product link must not survive a reset.
+        state = self._full_canvas()
+        state["campaign_link"] = "https://shop.example/product-A"
+        apply_new_video_reset(state)
+        self.assertEqual(state["campaign_link"], "")
 
     def test_preserved_keys_never_overlap_cleared_keys(self):
         # A key can't be both preserved and cleared — guards against a future

@@ -100,6 +100,10 @@ if "ui_language" not in st.session_state:
 if "local_video_materials" not in st.session_state:
     # 记住用户最近一次已经落盘的本地素材，避免仅修改文案后二次生成时丢失素材列表。
     st.session_state["local_video_materials"] = []
+if "campaign_shop" not in st.session_state:
+    # Account-level: one shop per account, seeded once from config so it is not
+    # retyped every video (the on_change callback keeps config in sync).
+    st.session_state["campaign_shop"] = config.app.get("campaign_shop", "")
 
 # 加载语言文件
 locales = utils.load_locales(i18n_dir)
@@ -436,6 +440,33 @@ def _save_channel_niche():
         "channel_niche_input", ""
     ).strip()
     config.save_config()
+
+
+def _save_campaign_shop():
+    """Persist the shop name to config on edit — one account sells one shop, so
+    it is account-level state like the channel niche (retyped for every product
+    otherwise). The affiliate LINK is deliberately NOT persisted: it is
+    per-product and must be entered fresh each video."""
+    config.app["campaign_shop"] = st.session_state.get(
+        "campaign_shop", ""
+    ).strip()
+    config.save_config()
+
+
+def _burn_hook(index):
+    """on_click callback: send the chosen (possibly edited) generated hook to
+    the 'Burn Opening Hook' on-screen overlay box and switch the burn toggle
+    on, so a hook idea can go straight onto the video instead of being copied
+    by hand from Step 2 up to Step 1. Both targets are keyed widgets, so this
+    must run in a callback (before they re-instantiate)."""
+    hooks = st.session_state.get("video_hooks") or []
+    edited = st.session_state.get(f"video_hook_{index}")
+    fallback = hooks[index] if 0 <= index < len(hooks) else ""
+    chosen = (edited or fallback).strip()
+    if chosen:
+        st.session_state["hook_text_input"] = chosen
+        st.session_state["hook_enabled"] = True
+        st.toast(tr("Hook Burned"))
 
 
 def _start_new_video():
@@ -1053,7 +1084,14 @@ with step1:
         with camp_cols2[0]:
             st.text_input(tr("Campaign Code"), key="campaign_code")
         with camp_cols2[1]:
-            st.text_input(tr("Campaign Shop"), key="campaign_shop")
+            # Account-level: seeded from config in the init block (not value=,
+            # which would clash with the Load-example prefill that also writes
+            # this key) and persisted on change, like the channel niche.
+            st.text_input(
+                tr("Campaign Shop"),
+                key="campaign_shop",
+                on_change=_save_campaign_shop,
+            )
         st.text_input(tr("Campaign Link"), key="campaign_link")
 
         campaign = _campaign_values()
@@ -1393,11 +1431,15 @@ with step2:
                             key=f"video_hook_{i}",
                         )
                     with hook_cols[1]:
-                        # Vertical spacer so the button lines up with the input box
-                        # below its label.
+                        # Vertical spacer so the buttons line up with the input
+                        # box below its label.
                         st.write("")
                         st.write("")
-                        if st.button(tr("Use Hook"), key=f"use_hook_{i}"):
+                        if st.button(
+                            tr("Use Hook"),
+                            key=f"use_hook_{i}",
+                            use_container_width=True,
+                        ):
                             # Use the user's possibly-edited hook (the keyed input)
                             # and their live script edits (params.video_script,
                             # the unkeyed box above) so neither is silently lost.
@@ -1409,6 +1451,15 @@ with step2:
                                 f"{chosen_hook}\n\n{existing}" if existing else chosen_hook
                             )
                             st.rerun()
+                        # Send this hook straight to the on-screen "Burn Opening
+                        # Hook" overlay (Step 1) instead of only into the script.
+                        st.button(
+                            tr("Burn Hook"),
+                            key=f"burn_hook_{i}",
+                            use_container_width=True,
+                            on_click=_burn_hook,
+                            args=(i,),
+                        )
                 st.caption(tr("Hook Use Hint"))
             elif "video_hooks" in st.session_state:
                 st.info(tr("No Hooks"))
