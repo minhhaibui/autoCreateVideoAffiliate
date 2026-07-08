@@ -9,6 +9,7 @@ from app.services.onboarding import (
     NEW_VIDEO_TEXT_KEYS,
     apply_new_video_reset,
     example_prefill,
+    fill_empty_product_from_subject,
     should_show_onboarding,
 )
 
@@ -117,6 +118,31 @@ class TestApplyNewVideoReset(unittest.TestCase):
         state = {"video_subject": "x"}
         apply_new_video_reset(state)
         self.assertEqual(state["video_subject"], "")
+
+
+class TestFillEmptyProductFromSubject(unittest.TestCase):
+    def test_fills_when_product_empty(self):
+        state = {"video_subject": "Máy xay sinh tố mini", "campaign_product": ""}
+        fill_empty_product_from_subject(state)
+        self.assertEqual(state["campaign_product"], "Máy xay sinh tố mini")
+
+    def test_does_not_overwrite_an_existing_product(self):
+        state = {
+            "video_subject": "Máy xay sinh tố mini",
+            "campaign_product": "Máy xay 300W chính hãng",
+        }
+        fill_empty_product_from_subject(state)
+        self.assertEqual(state["campaign_product"], "Máy xay 300W chính hãng")
+
+    def test_blank_subject_does_nothing(self):
+        state = {"video_subject": "   ", "campaign_product": ""}
+        fill_empty_product_from_subject(state)
+        self.assertEqual(state["campaign_product"], "")
+
+    def test_missing_keys_do_not_raise(self):
+        state = {"video_subject": "Đèn ngủ"}
+        fill_empty_product_from_subject(state)
+        self.assertEqual(state["campaign_product"], "Đèn ngủ")
 
 
 if __name__ == "__main__":

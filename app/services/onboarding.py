@@ -101,3 +101,13 @@ def apply_new_video_reset(state):
         state[key] = ""
     for key in NEW_VIDEO_ASSET_KEYS:
         state.pop(key, None)
+
+
+def fill_empty_product_from_subject(state):
+    """Mirror the video subject into an EMPTY campaign product in ``state`` (in
+    place): the two are the same thing typed in two boxes, so a filled subject
+    should seed the product name that the CTA / end-card / export read. Never
+    overwrites a product the user already typed. Pure, so it is unit-testable."""
+    subject = (state.get("video_subject") or "").strip()
+    if subject and not (state.get("campaign_product") or "").strip():
+        state["campaign_product"] = subject

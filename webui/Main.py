@@ -47,6 +47,7 @@ from app.services.preflight import is_llm_ready
 from app.services.onboarding import (
     apply_new_video_reset,
     example_prefill,
+    fill_empty_product_from_subject,
     should_show_onboarding,
 )
 from app.utils import utils
@@ -451,6 +452,16 @@ def _save_campaign_shop():
         "campaign_shop", ""
     ).strip()
     config.save_config()
+
+
+def _sync_campaign_product_from_subject():
+    """on_change callback: when the user types a Video Subject and hasn't given
+    the campaign a product name yet, mirror the subject into Campaign Product so
+    the CTA / end-card / export don't silently lose the product name (they were
+    two separate boxes for the same thing). Only fills an EMPTY campaign product
+    — once the user edits it, their wording is never overwritten. The logic is
+    unit-tested in onboarding.fill_empty_product_from_subject."""
+    fill_empty_product_from_subject(st.session_state)
 
 
 def _burn_hook(index):
@@ -1058,7 +1069,13 @@ with step1:
                     if st.button(
                         tr("Use as Subject"), key=f"use_product_idea_{i}"
                     ):
-                        st.session_state["video_subject"] = idea.get("product", "")
+                        # Fill BOTH the subject and the campaign product name in
+                        # one click — picking an idea clearly means "make this
+                        # product", and the CTA/end-card/export all read the
+                        # campaign product, so leaving it blank silently drops it.
+                        chosen_product = idea.get("product", "")
+                        st.session_state["video_subject"] = chosen_product
+                        st.session_state["campaign_product"] = chosen_product
                         st.rerun()
             st.button(
                 f"📦 {tr('Send Ideas to Batch')}",
@@ -1193,6 +1210,7 @@ with step1:
         params.video_subject = st.text_input(
             tr("Video Subject"),
             key="video_subject",
+            on_change=_sync_campaign_product_from_subject,
         ).strip()
 
         video_languages = [
