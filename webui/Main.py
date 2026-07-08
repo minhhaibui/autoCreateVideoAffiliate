@@ -44,7 +44,11 @@ from app.services.campaign import (
 )
 from app.services.fonts import get_recommended_font
 from app.services.preflight import is_llm_ready
-from app.services.onboarding import example_prefill, should_show_onboarding
+from app.services.onboarding import (
+    apply_new_video_reset,
+    example_prefill,
+    should_show_onboarding,
+)
 from app.utils import utils
 
 st.set_page_config(
@@ -432,6 +436,17 @@ def _save_channel_niche():
         "channel_niche_input", ""
     ).strip()
     config.save_config()
+
+
+def _start_new_video():
+    """on_click callback: clear the current product's subject, script,
+    keywords, campaign product fields, burned-overlay text and every generated
+    copy panel so the canvas is ready for the next product — without touching
+    account-level settings, the batch list or the planning tools. Runs in a
+    callback so the blanks land before the keyed widgets re-instantiate. The
+    key partitioning lives (and is unit-tested) in onboarding.apply_new_video_reset."""
+    apply_new_video_reset(st.session_state)
+    st.toast(tr("New Video Ready"))
 
 
 def render_detail_fields(item, fields):
@@ -2952,17 +2967,37 @@ if start_button:
 
     video_files = result.get("videos", [])
     st.success(tr("Video Generation Completed"))
-    try:
-        if video_files:
-            player_cols = st.columns(len(video_files) * 2 + 1)
-            for i, url in enumerate(video_files):
-                player_cols[i * 2 + 1].video(url)
-    except Exception:
-        pass
+    # Stash the finished render so its players + open-folder survive the next
+    # rerun (any widget touch reruns Streamlit and would otherwise wipe the
+    # preview emitted inside this click block — the same fix the batch report
+    # already uses). Cleared by "New video".
+    st.session_state["last_video_result"] = {
+        "task_id": task_id,
+        "videos": video_files,
+    }
 
     open_task_folder(task_id)
     logger.info(tr("Video Generation Completed"))
     scroll_to_bottom()
+
+# Persistent last-render block + "New video" reset — survives reruns until the
+# next render overwrites it or the user clears the canvas for the next product.
+last_video_result = st.session_state.get("last_video_result")
+if last_video_result and last_video_result.get("videos"):
+    video_files = last_video_result["videos"]
+    try:
+        player_cols = st.columns(len(video_files) * 2 + 1)
+        for i, url in enumerate(video_files):
+            player_cols[i * 2 + 1].video(url)
+    except Exception:
+        pass
+    st.button(
+        f"🆕 {tr('New Video')}",
+        use_container_width=True,
+        key="start_new_video_button",
+        on_click=_start_new_video,
+        help=tr("New Video Help"),
+    )
 
 # Batch mode — paste one product/subject per line and render a video for each,
 # reusing the current voice/source/subtitle settings. Every item runs with an

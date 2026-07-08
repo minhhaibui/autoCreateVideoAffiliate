@@ -39,3 +39,61 @@ def example_prefill(subject, product, shop):
         "campaign_code": EXAMPLE_CODE,
         "campaign_link": EXAMPLE_LINK,
     }
+
+
+# One product's per-video content, cleared by the WebUI's "New video" button so
+# the canvas is ready for the next product. Text/keyed-widget fields are blanked
+# (so the widgets re-read ""); generated-asset panels are removed entirely.
+NEW_VIDEO_TEXT_KEYS = (
+    "video_subject",
+    "video_script",
+    "video_terms",
+    "campaign_product",
+    "campaign_price",
+    "campaign_code",
+    "hook_text_input",
+    "onscreen_cta_text",
+    "end_card_text",
+)
+NEW_VIDEO_ASSET_KEYS = (
+    "video_hooks",
+    "video_shots",
+    "script_variants",
+    "social_metadata",
+    "comment_replies",
+    "pinned_comments",
+    "disclosure_lines",
+    "save_share_prompts",
+    "buyer_qa",
+    "schedule_slots",
+    "performance_insights",
+    "sound_ideas",
+    "text_stickers",
+    "cover_ideas",
+    "last_video_result",
+)
+
+# Account-level / cross-video state that "New video" must NEVER clear: the
+# channel niche, the shop and affiliate link (retyped otherwise), the batch
+# list, and the multi-video planning tools. Listed explicitly so a unit test
+# can prove the reset leaves them alone even if new keys are added later.
+NEW_VIDEO_PRESERVED_KEYS = (
+    "channel_niche_input",
+    "campaign_shop",
+    "campaign_link",
+    "batch_subjects",
+    "product_ideas",
+    "content_calendar",
+    "ui_language",
+)
+
+
+def apply_new_video_reset(state):
+    """Clear one product's per-video content in ``state`` (a dict-like session
+    state) in place: blank the text/widget fields, drop the generated-asset
+    panels. Account-level state, the batch list and the planning tools are left
+    untouched. Pure (no Streamlit dependency) so it is unit-testable."""
+    for key in NEW_VIDEO_TEXT_KEYS:
+        state[key] = ""
+    for key in NEW_VIDEO_ASSET_KEYS:
+        state.pop(key, None)
