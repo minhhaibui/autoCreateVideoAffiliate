@@ -2398,8 +2398,11 @@ with step3:
                 help=tr("Video Encoder Help"),
             )
             config.app["video_codec"] = video_codec_options[selected_codec_index][1]
-    with st.container(border=True):
-        st.write(tr("Audio Settings"))
+    # Collapsed by default: these round-trip through config, so a daily user
+    # who set their voice once doesn't need to scroll past the whole panel to
+    # reach Generate. Video Settings above stays open (source is the one control
+    # that changes occasionally).
+    with st.expander(tr("Audio Settings"), expanded=False):
 
         # 添加TTS服务器选择下拉框
         tts_servers = [
@@ -2685,6 +2688,8 @@ with step3:
         )
 
 with step3:
+    # Kept as an open container (NOT an expander): it holds the Subtitle Preview
+    # expander below, and Streamlit forbids nesting an expander in an expander.
     with st.container(border=True):
         st.write(tr("Subtitle Settings"))
         params.subtitle_enabled = st.checkbox(tr("Enable Subtitles"), value=True)
