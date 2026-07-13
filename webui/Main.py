@@ -1299,7 +1299,10 @@ with step1:
                 )
 
         if st.button(
-            tr("Generate Video Script and Keywords"), key="auto_generate_script"
+            tr("Generate Video Script and Keywords"),
+            key="auto_generate_script",
+            disabled=not params.video_subject,
+            help=None if params.video_subject else tr("Generate Needs Subject"),
         ):
             with st.spinner(tr("Generating Video Script and Keywords")):
                 script = llm.generate_script(
@@ -1330,7 +1333,12 @@ with step1:
                 value=llm.DEFAULT_SCRIPT_VARIANT_COUNT,
                 key="script_variant_count",
             )
-            if st.button(tr("Generate AB Variants"), key="auto_generate_variants"):
+            if st.button(
+                tr("Generate AB Variants"),
+                key="auto_generate_variants",
+                disabled=not params.video_subject,
+                help=None if params.video_subject else tr("Generate Needs Subject"),
+            ):
                 if not params.video_subject:
                     st.error(tr("Please Enter the Video Subject"))
                 else:
@@ -1431,7 +1439,12 @@ with step2:
                 value=llm.DEFAULT_HOOK_COUNT,
                 key="hook_amount",
             )
-            if st.button(tr("Generate Hooks"), key="auto_generate_hooks"):
+            if st.button(
+                tr("Generate Hooks"),
+                key="auto_generate_hooks",
+                disabled=not params.video_subject,
+                help=None if params.video_subject else tr("Generate Needs Subject"),
+            ):
                 if not params.video_subject:
                     st.error(tr("Please Enter the Video Subject"))
                 else:
@@ -1503,7 +1516,12 @@ with step2:
                 value=llm.DEFAULT_SHOT_COUNT,
                 key="shot_amount",
             )
-            if st.button(tr("Generate Shot List"), key="auto_generate_shots"):
+            if st.button(
+                tr("Generate Shot List"),
+                key="auto_generate_shots",
+                disabled=not params.video_subject,
+                help=None if params.video_subject else tr("Generate Needs Subject"),
+            ):
                 if not params.video_subject:
                     st.error(tr("Please Enter the Video Subject"))
                 else:
@@ -1577,8 +1595,14 @@ with step2:
                 )
                 social_platform = social_platforms[selected_social_index][1]
 
+                caption_ready = bool(
+                    params.video_subject or st.session_state.get("video_script", "")
+                )
                 if st.button(
-                    tr("Generate Caption and Hashtags"), key="auto_generate_social"
+                    tr("Generate Caption and Hashtags"),
+                    key="auto_generate_social",
+                    disabled=not caption_ready,
+                    help=None if caption_ready else tr("Generate Needs Subject"),
                 ):
                     current_script = st.session_state.get("video_script", "")
                     if not params.video_subject and not current_script:
@@ -1622,7 +1646,12 @@ with step2:
                     value=llm.DEFAULT_COMMENT_REPLY_COUNT,
                     key="comment_reply_amount",
                 )
-                if st.button(tr("Generate Comment Replies"), key="auto_generate_comment_replies"):
+                if st.button(
+                    tr("Generate Comment Replies"),
+                    key="auto_generate_comment_replies",
+                    disabled=not params.video_subject,
+                    help=None if params.video_subject else tr("Generate Needs Subject"),
+                ):
                     if not params.video_subject:
                         st.error(tr("Please Enter the Video Subject"))
                     else:
@@ -1669,7 +1698,12 @@ with step2:
                     value=llm.DEFAULT_SCHEDULE_COUNT,
                     key="schedule_amount",
                 )
-                if st.button(tr("Suggest Posting Times"), key="auto_generate_schedule"):
+                if st.button(
+                    tr("Suggest Posting Times"),
+                    key="auto_generate_schedule",
+                    disabled=not params.video_subject,
+                    help=None if params.video_subject else tr("Generate Needs Subject"),
+                ):
                     if not params.video_subject:
                         st.error(tr("Please Enter the Video Subject"))
                     else:
@@ -1711,7 +1745,12 @@ with step2:
                     value=llm.DEFAULT_PINNED_COMMENT_COUNT,
                     key="pinned_amount",
                 )
-                if st.button(tr("Generate Pinned Comment"), key="auto_generate_pinned"):
+                if st.button(
+                    tr("Generate Pinned Comment"),
+                    key="auto_generate_pinned",
+                    disabled=not params.video_subject,
+                    help=None if params.video_subject else tr("Generate Needs Subject"),
+                ):
                     if not params.video_subject:
                         st.error(tr("Please Enter the Video Subject"))
                     else:
@@ -1761,7 +1800,12 @@ with step2:
                     value=llm.DEFAULT_DISCLOSURE_COUNT,
                     key="disclosure_amount",
                 )
-                if st.button(tr("Generate Disclosure"), key="auto_generate_disclosure"):
+                if st.button(
+                    tr("Generate Disclosure"),
+                    key="auto_generate_disclosure",
+                    disabled=not params.video_subject,
+                    help=None if params.video_subject else tr("Generate Needs Subject"),
+                ):
                     if not params.video_subject:
                         st.error(tr("Please Enter the Video Subject"))
                     else:
@@ -1814,7 +1858,12 @@ with step2:
                     value=llm.DEFAULT_SAVE_BAIT_COUNT,
                     key="save_share_amount",
                 )
-                if st.button(tr("Generate Save Prompts"), key="auto_generate_save_share"):
+                if st.button(
+                    tr("Generate Save Prompts"),
+                    key="auto_generate_save_share",
+                    disabled=not params.video_subject,
+                    help=None if params.video_subject else tr("Generate Needs Subject"),
+                ):
                     if not params.video_subject:
                         st.error(tr("Please Enter the Video Subject"))
                     else:
@@ -1863,7 +1912,12 @@ with step2:
                     value=llm.DEFAULT_BUYER_QA_COUNT,
                     key="buyer_qa_amount",
                 )
-                if st.button(tr("Generate Buyer QA"), key="auto_generate_buyer_qa"):
+                if st.button(
+                    tr("Generate Buyer QA"),
+                    key="auto_generate_buyer_qa",
+                    disabled=not params.video_subject,
+                    help=None if params.video_subject else tr("Generate Needs Subject"),
+                ):
                     if not params.video_subject:
                         st.error(tr("Please Enter the Video Subject"))
                     else:

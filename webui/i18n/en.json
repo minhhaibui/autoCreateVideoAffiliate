@@ -24,6 +24,7 @@
     "Video Script": "Video Script (:blue[① Optional, AI generated  ② Proper punctuation helps with subtitle generation])",
     "Generate Video Keywords": "Click to use AI to generate [Video Keywords] based on **script**",
     "Please Enter the Video Subject": "Please Enter the Video Script First",
+    "Generate Needs Subject": "Enter a Video Subject in Step 1 to enable this",
     "Generating Video Script and Keywords": "AI is generating video script and keywords...",
     "Generating Video Keywords": "AI is generating video keywords...",
     "Video Keywords": "Video Keywords (:blue[① Optional, AI generated ② Use **English commas** for separation, English only])",

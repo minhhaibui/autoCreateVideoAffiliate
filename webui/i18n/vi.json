@@ -24,6 +24,7 @@
     "Video Script": "Kịch Bản Video (:blue[① Tùy chọn, AI tạo ra  ② Dấu câu chính xác giúp việc tạo phụ đề)",
     "Generate Video Keywords": "Nhấn để sử dụng AI để tạo [Từ Khóa Video] dựa trên **kịch bản**",
     "Please Enter the Video Subject": "Vui lòng Nhập Kịch Bản Video Trước",
+    "Generate Needs Subject": "Nhập Chủ Đề Video ở Bước 1 để bật nút này",
     "Generating Video Script and Keywords": "AI đang tạo kịch bản video và từ khóa...",
     "Generating Video Keywords": "AI đang tạo từ khóa video...",
     "Video Keywords": "Từ Khóa Video (:blue[① Tùy chọn, AI tạo ra ② Sử dụng dấu phẩy **Tiếng Anh** để phân tách, chỉ sử dụng Tiếng Anh])",
