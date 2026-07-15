@@ -1568,6 +1568,7 @@ with step2:
             "Affiliate Disclosure",
             "Save Share Prompts",
             "Buyer QA",
+            "Competitor Teardown",
             "Performance Review",
             "Content Calendar",
         ]
@@ -1954,6 +1955,63 @@ with step2:
         # your own numbers → repeat the winners. The creator pastes their
         # per-video stats free-form; insights must quote those numbers and
         # never invent benchmarks (same honesty rule as link/code verbatim).
+        # Competitor teardown — the user pastes competitor hooks/captions they
+        # collected and the LLM finds the saturated angles + a way to stand out.
+        # Market research grounded strictly in the pasted content (no invented
+        # competitor data), so it validates its own paste rather than the subject.
+        if social_view == "Competitor Teardown":
+            with st.container(border=True):
+                st.write(tr("Competitor Teardown"))
+                st.caption(tr("Competitor Teardown Hint"))
+                competitor_text = st.text_area(
+                    tr("Paste Competitor Content"),
+                    key="competitor_content_input",
+                    height=160,
+                    placeholder=tr("Competitor Content Placeholder"),
+                )
+                competitor_amount = st.slider(
+                    tr("Number of Patterns"),
+                    min_value=1,
+                    max_value=llm.MAX_COMPETITOR_INSIGHT_COUNT,
+                    value=llm.DEFAULT_COMPETITOR_INSIGHT_COUNT,
+                    key="competitor_amount",
+                )
+                if st.button(
+                    tr("Generate Competitor Teardown"),
+                    key="auto_generate_competitor",
+                ):
+                    if not competitor_text.strip():
+                        st.error(tr("Please Paste Competitor Content"))
+                    else:
+                        with st.spinner(tr("Generating Competitor Teardown")):
+                            st.session_state["competitor_patterns"] = llm.generate_competitor_analysis(
+                                competitor_text=competitor_text,
+                                product=params.video_subject,
+                                language=(
+                                    params.video_language
+                                    or st.session_state.get("ui_language", "")
+                                ),
+                                amount=competitor_amount,
+                            )
+
+                competitor_patterns = st.session_state.get("competitor_patterns") or []
+                if competitor_patterns:
+                    for i, item in enumerate(competitor_patterns):
+                        with st.expander(
+                            f"🔍 {item.get('pattern', '')}",
+                            expanded=(i == 0),
+                        ):
+                            render_detail_fields(
+                                item,
+                                [
+                                    ("why_it_works", "Competitor Why It Works"),
+                                    ("your_move", "Competitor Your Move"),
+                                ],
+                            )
+                    st.caption(tr("Competitor Teardown Use Hint"))
+                elif "competitor_patterns" in st.session_state:
+                    st.info(tr("No Competitor Patterns"))
+
         if social_view == "Performance Review":
             with st.container(border=True):
                 st.write(tr("Performance Review"))

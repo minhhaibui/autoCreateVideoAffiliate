@@ -1731,6 +1731,100 @@ class TestPerformanceReview(unittest.TestCase):
             )
 
 
+class TestCompetitorAnalysis(unittest.TestCase):
+    """Phân tích nội dung đối thủ đã dán (pattern/why_it_works/your_move)."""
+
+    CONTENT = (
+        "POV: you finally found a blender that fits your cupboard\n"
+        "3 kitchen gadgets you didn't know you needed\n"
+        "This $9 tool saves me 20 minutes every morning"
+    )
+
+    def test_generate_competitor_analysis_parses_objects(self):
+        payload = json.dumps(
+            [
+                {
+                    "pattern": "POV first-person openers",
+                    "why_it_works": "Feels like a peer, not an ad",
+                    "your_move": "Open on the exact moment the problem hits",
+                },
+                {
+                    "pattern": "Price-shock hooks",
+                    "why_it_works": "Low price kills purchase hesitation",
+                    "your_move": "Lead with the time saved, not the price",
+                },
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            patterns = llm.generate_competitor_analysis(competitor_text=self.CONTENT)
+
+        self.assertEqual(len(patterns), 2)
+        self.assertEqual(patterns[0]["pattern"], "POV first-person openers")
+        for item in patterns:
+            self.assertEqual(set(item.keys()), set(llm.COMPETITOR_KEYS))
+
+    def test_generate_competitor_analysis_drops_items_without_pattern(self):
+        payload = json.dumps(
+            [
+                {"why_it_works": "no pattern", "your_move": "dropped"},
+                "not a dict",
+                {"pattern": "Only this survives", "your_move": "keep it"},
+            ]
+        )
+        with patch.object(llm, "_generate_response", return_value=payload):
+            patterns = llm.generate_competitor_analysis(competitor_text=self.CONTENT)
+
+        self.assertEqual(len(patterns), 1)
+        self.assertEqual(patterns[0]["pattern"], "Only this survives")
+
+    def test_generate_competitor_analysis_recovers_embedded_json(self):
+        payload = 'Sure: [{"pattern": "Before/after reveals"}] hope it helps'
+        with patch.object(llm, "_generate_response", return_value=payload):
+            patterns = llm.generate_competitor_analysis(competitor_text=self.CONTENT)
+
+        self.assertEqual(len(patterns), 1)
+        self.assertEqual(patterns[0]["pattern"], "Before/after reveals")
+
+    def test_generate_competitor_analysis_embeds_content_and_honesty_rule(self):
+        with patch.object(llm, "_generate_response", return_value="[]") as mocked:
+            llm.generate_competitor_analysis(competitor_text=self.CONTENT)
+
+        prompt = mocked.call_args[0][0]
+        self.assertIn("blender that fits your cupboard", prompt)
+        self.assertIn("NEVER invent competitor", prompt)
+
+    def test_generate_competitor_analysis_product_tailors_your_move(self):
+        with patch.object(llm, "_generate_response", return_value="[]") as mocked:
+            llm.generate_competitor_analysis(
+                competitor_text=self.CONTENT, product="Máy xay sinh tố mini"
+            )
+        with_product = mocked.call_args[0][0]
+        self.assertIn("Máy xay sinh tố mini", with_product)
+        self.assertIn("angle for THIS product", with_product)
+
+        with patch.object(llm, "_generate_response", return_value="[]") as mocked:
+            llm.generate_competitor_analysis(competitor_text=self.CONTENT)
+        without_product = mocked.call_args[0][0]
+        self.assertNotIn("angle for THIS product", without_product)
+        self.assertIn("did not name their product", without_product)
+
+    def test_generate_competitor_analysis_truncates_long_input(self):
+        long_text = "x" * (llm.MAX_COMPETITOR_INPUT_LENGTH + 500)
+        with patch.object(llm, "_generate_response", return_value="[]") as mocked:
+            llm.generate_competitor_analysis(competitor_text=long_text)
+
+        prompt = mocked.call_args[0][0]
+        self.assertNotIn("x" * (llm.MAX_COMPETITOR_INPUT_LENGTH + 1), prompt)
+
+    def test_generate_competitor_analysis_returns_empty_on_error(self):
+        with patch.object(
+            llm, "_generate_response", return_value="Error: api_key is not set"
+        ):
+            self.assertEqual(
+                llm.generate_competitor_analysis(competitor_text=self.CONTENT), []
+            )
+
+
 class TestContentCalendar(unittest.TestCase):
     """Lịch nội dung theo ngách (day/subject/angle/goal), đổ được vào batch."""
 

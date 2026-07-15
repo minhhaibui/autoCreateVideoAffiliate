@@ -2431,6 +2431,98 @@ The creator pasted the stats of their OWN recent affiliate videos below (one vid
     return insights[:amount]
 
 
+DEFAULT_COMPETITOR_INSIGHT_COUNT = 4
+MAX_COMPETITOR_INSIGHT_COUNT = 8
+MAX_COMPETITOR_FIELD_LENGTH = 400
+MAX_COMPETITOR_INPUT_LENGTH = 4000
+
+COMPETITOR_KEYS = ("pattern", "why_it_works", "your_move")
+
+
+def generate_competitor_analysis(
+    competitor_text: str,
+    product: str = "",
+    language: str = "",
+    amount: int = DEFAULT_COMPETITOR_INSIGHT_COUNT,
+) -> List[dict]:
+    """Tear down competitor content the creator has ALREADY collected — hooks,
+    captions or video descriptions they pasted, one per line — and turn it into
+    a market-research brief: which angles are saturated and how THIS creator can
+    stand out. Market research is only as honest as its data, so the analysis is
+    grounded strictly in the pasted text: the prompt forbids inventing competitor
+    videos, view counts or trends that are not in the paste, mirroring the
+    verbatim-link honesty rule the rest of the toolkit follows.
+
+    Returns a list of dicts with the keys in COMPETITOR_KEYS. ``pattern`` is a
+    recurring hook/angle/format seen across the pasted content, ``why_it_works``
+    the reason it grabs attention or converts, and ``your_move`` a concrete
+    differentiated angle for the creator's own ``product`` (do it better, or go
+    where the competitors are not). On repeated failure an empty list is returned
+    so the caller can show a friendly message rather than crash.
+    """
+    amount = _clamp_count(
+        amount, DEFAULT_COMPETITOR_INSIGHT_COUNT, MAX_COMPETITOR_INSIGHT_COUNT
+    )
+    competitor_text = _limit_social_text(
+        competitor_text, MAX_COMPETITOR_INPUT_LENGTH, "competitor_text"
+    )
+    product = _clamp_text(product, MAX_SOCIAL_SUBJECT_LENGTH).strip()
+    language = (language or "").strip()
+
+    language_line = (
+        f'Write the "pattern", "why_it_works" and "your_move" fields in this language: {language}.'
+        if language
+        else "Write every text field in the same language as the pasted competitor content."
+    )
+    product_line = (
+        f'The creator promotes this product: "{product}". Make every "your_move" a concrete angle for THIS product.'
+        if product
+        else 'The creator did not name their product, so keep each "your_move" a differentiation tactic they can apply to their own product.'
+    )
+
+    prompt = f"""
+# Role: TikTok Affiliate Market Analyst
+
+## Goals:
+The creator pasted competitor content they collected below (competitor hooks, captions or video descriptions — typically one per line). Find up to {amount} recurring patterns ACROSS this content and, for each, tell the creator how to stand out instead of blending in.
+
+## Important:
+1. {product_line}
+2. read only what is pasted — every "pattern" must reflect wording, angles or formats that actually appear in the pasted content.
+3. a "pattern" is something REPEATED across competitors (e.g. "opens on a price shock", "before/after reveal", "fear-of-missing-out urgency"), not a one-off line.
+4. "your_move" must be a differentiation play: either do the winning pattern better, or deliberately go where the competitors are NOT (an angle none of them use).
+5. if the pasted content is too thin to find real patterns (e.g. one line, or all identical), say exactly that in a "pattern" and make "your_move" what to collect more of.
+
+## Constrains:
+1. return ONLY a json-array of objects. do not return any text before or after the json.
+2. each object must have exactly these keys: "pattern", "why_it_works", "your_move".
+   - "pattern": the recurring competitor angle/hook/format found in the pasted content.
+   - "why_it_works": why that pattern grabs attention or drives sales.
+   - "your_move": one concrete differentiated angle the creator can use.
+3. {language_line}
+4. NEVER invent competitor videos, creators, view counts, follower numbers, trends or benchmarks that are not in the pasted content.
+5. make the patterns clearly different from each other; return fewer than {amount} rather than padding with weak ones.
+
+## Output Example:
+[{{"pattern": "...", "why_it_works": "...", "your_move": "..."}}]
+
+## The pasted competitor content:
+{competitor_text}
+""".strip()
+
+    logger.info(
+        f"generating competitor analysis: input_chars={len(competitor_text)}, "
+        f"product={product!r}, amount={amount}, language={language!r}"
+    )
+
+    patterns = _generate_json_object_list(
+        prompt,
+        lambda x: _coerce_keyed_dict(x, COMPETITOR_KEYS, ("pattern",), MAX_COMPETITOR_FIELD_LENGTH),
+        "competitor analysis",
+    )
+    return patterns[:amount]
+
+
 DEFAULT_CALENDAR_DAY_COUNT = 7
 MAX_CALENDAR_DAY_COUNT = 14
 MAX_CALENDAR_FIELD_LENGTH = 300
