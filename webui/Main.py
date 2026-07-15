@@ -92,6 +92,11 @@ streamlit_style = """
   --mpt-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
+/* The Streamlit header is a fixed bar that covers content on scroll; with
+ * toolbarMode=minimal it is an empty band, so remove it entirely and give the
+ * page a normal scroll. */
+header[data-testid="stHeader"] { display: none; }
+
 /* Reclaim the empty band above the wordmark so Step 1 starts above the fold. */
 .block-container,
 [data-testid="stMainBlockContainer"] {
