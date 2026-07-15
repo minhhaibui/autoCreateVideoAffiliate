@@ -1,0 +1,12 @@
+[
+  {
+    "date": "2026-07-15",
+    "scope": "app",
+    "macrostructure": "Workbench",
+    "theme": "custom",
+    "theme_axes": "light-warm / rounded-sans / warm-coral",
+    "vibe": "warm cream, friendly, Vietnamese-first work tool",
+    "enrichment": "none",
+    "brief": "MoneyPrinterTurbo Streamlit WebUI — friendliest possible UX for a non-technical Vietnamese TikTok-affiliate creator"
+  }
+]

@@ -67,10 +67,102 @@ st.set_page_config(
 )
 
 
+# Design layer on top of the [theme] block in .streamlit/config.toml — the two
+# together are the whole design system (locked in design.md at the project
+# root). Structural CSS only targets stable data-testid / data-baseweb hooks so
+# Streamlit upgrades don't silently break it.
 streamlit_style = """
 <style>
+/* Hallmark · genre: playful · macrostructure: Workbench (3-step wizard app) · theme: custom (Hum-adapted, app register)
+ * paper oklch(97.5% 0.012 95) #FAF7EF · ink oklch(20% 0.012 250) #23252C · accent coral oklch(58% 0.17 30) #D64F35
+ * display+body: Plus Jakarta Sans (vietnamese subset) · design-system: design.md · designed-as-app
+ */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --mpt-paper: #FAF7EF;
+  --mpt-paper-2: #F2EDE0;
+  --mpt-paper-3: #EAE3D2;
+  --mpt-ink: #23252C;
+  --mpt-ink-2: #5B5E6A;
+  --mpt-accent: #D64F35;
+  --mpt-accent-deep: #A83A24;
+  --mpt-accent-soft: #F9E2DB;
+  --mpt-rule: #E5DECC;
+  --mpt-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Reclaim the empty band above the wordmark so Step 1 starts above the fold. */
+.block-container,
+[data-testid="stMainBlockContainer"] {
+  padding-top: 2.2rem;
+}
+
+/* Compact wordmark — the app is a tool, not a landing hero. */
 h1 {
-    padding-top: 0 !important;
+  padding-top: 0 !important;
+  font-size: 1.65rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em;
+}
+
+/* Wizard tabs → stepper pills. The i18n labels already carry ① ② ③, so the
+ * pills read as a numbered progress path instead of underlined text tabs. */
+.stTabs [data-baseweb="tab-list"] {
+  gap: 0.5rem;
+  border-bottom: none !important;
+}
+.stTabs [data-baseweb="tab"] {
+  border-radius: 999px;
+  padding: 0.35rem 1.15rem;
+  background: var(--mpt-paper-2);
+  font-weight: 600;
+  font-size: 1rem;
+}
+.stTabs [data-baseweb="tab"]:hover {
+  background: var(--mpt-paper-3);
+}
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+  background: var(--mpt-accent-soft);
+  color: var(--mpt-ink);
+}
+.stTabs [data-baseweb="tab-highlight"],
+.stTabs [data-baseweb="tab-border"] {
+  display: none;
+}
+
+/* Buttons — the press is the feedback: lift on hover, press down on click.
+ * The primary (coral) button carries a solid edge that shrinks when pressed. */
+.stButton > button {
+  font-weight: 600;
+  transition: transform 140ms var(--mpt-ease), box-shadow 140ms var(--mpt-ease);
+}
+.stButton > button:hover { transform: translateY(-1px); }
+.stButton > button:active { transform: translateY(1px); }
+.stButton > button[kind="primary"] {
+  box-shadow: 0 3px 0 0 var(--mpt-accent-deep), 0 8px 16px -8px rgba(168, 58, 36, 0.5);
+}
+.stButton > button[kind="primary"]:hover {
+  box-shadow: 0 4px 0 0 var(--mpt-accent-deep), 0 12px 20px -8px rgba(168, 58, 36, 0.5);
+}
+.stButton > button[kind="primary"]:active {
+  box-shadow: 0 1px 0 0 var(--mpt-accent-deep);
+}
+
+/* Section cards: bordered containers + expanders get the softer 16px radius. */
+[data-testid="stVerticalBlockBorderWrapper"] { border-radius: 16px; }
+[data-testid="stExpander"] details { border-radius: 16px; }
+
+/* The page leans on caption hints everywhere — keep them readable, not faded. */
+[data-testid="stCaptionContainer"] { color: var(--mpt-ink-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .stButton > button,
+  .stButton > button:hover,
+  .stButton > button:active {
+    transform: none;
+    transition: none;
+  }
 }
 </style>
 """

@@ -1,6 +1,5 @@
-# Theme — see design.md at the project root (locked design system).
-# This mirror exists for users who run streamlit with webui/ as the CWD;
-# the canonical copy is .streamlit/config.toml at the project root.
+# Theme — see design.md (locked design system for the WebUI).
+# Mirrored in webui/.streamlit/config.toml for users who launch from webui/.
 
 [browser]
 gatherUsageStats = false
