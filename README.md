@@ -76,6 +76,8 @@ Ngoài việc tạo video, WebUI còn có một bộ công cụ giúp **bán hà
 - **Câu kêu Lưu / Chia sẻ** — tận dụng việc lưu & chia sẻ được thuật toán ưu tiên hơn lượt thích.
 - **Caption & hashtag chuẩn tìm kiếm** — title và caption viết theo cụm từ người mua sẽ tìm trên TikTok (search là tín hiệu xếp hạng), **trả lời bình luận**, **comment ghim**, **dòng công bố (disclosure)** minh bạch.
 - **Gợi ý nhạc trending**, **sticker chữ & CTA**, **chữ cho ảnh bìa/thumbnail**, **khung giờ đăng**.
+- **Hỏi đáp chốt đơn** — AI dự đoán các câu hỏi cản mua hàng (ship, chính hãng, đổi trả…) sẽ xuất hiện trong comment + soạn sẵn câu trả lời dán được ngay; không bao giờ bịa giá / mã / phí.
+- **Phân tích đối thủ** — dán hook / caption của các video đối thủ bạn sưu tầm, AI chỉ ra góc nội dung đã bão hòa và cách làm khác đi để nổi bật; chỉ phân tích đúng nội dung bạn dán.
 - **Đánh giá hiệu suất** — dán số liệu các video đã đăng (view, lượt lưu, đơn hàng…), AI chỉ ra mẫu nào đang chuyển đổi tốt để nhân bản; chỉ phân tích đúng số bạn dán, không bịa benchmark.
 
 **📦 Sản xuất hàng loạt & Xuất bản**
@@ -91,6 +93,53 @@ Ngoài việc tạo video, WebUI còn có một bộ công cụ giúp **bán hà
 - Như mọi tính năng khác: autopilot **không bao giờ bịa link affiliate** — báo cáo luôn nhắc bạn tự thêm link thật trước khi đăng.
 
 > Giao diện được tổ chức thành 3 bước: ① Sản phẩm & Kịch bản → ② Copy & Tài sản → ③ Video & Phụ đề. Hỗ trợ đa ngôn ngữ (Việt / English / Русский).
+
+## Hướng dẫn dùng từng bước 📖
+
+Hướng dẫn dưới đây dùng đúng tên nút trong giao diện tiếng Việt (chọn `vi - Tiếng Việt` ở góc phải trên).
+
+### Lần đầu mở app — cần đúng 2 chiếc chìa khóa
+
+1. Khởi động WebUI (`sh webui.sh` trên Mac/Linux hoặc `webui.bat` trên Windows) rồi mở trình duyệt tại `http://127.0.0.1:8501`.
+2. Mở **Cài Đặt Cơ Bản** đầu trang (panel tự mở sẵn nếu bạn chưa có key): chọn nhà cung cấp AI ở **Cài Đặt LLM** (ví dụ Gemini — có gói miễn phí) và dán **API Key**.
+3. Sang tab **③ Video & Phụ đề** → mục quản lý API key nguồn video: dán key **Pexels** (đăng ký miễn phí tại pexels.com/api).
+4. Thiếu key nào, app sẽ hiện **cảnh báo vàng ngay đầu trang** — cứ theo cảnh báo mà điền, không cần đoán.
+5. Mới dùng lần đầu? Bấm **✨ Tải ví dụ** ở dải chào mừng — app tự điền một sản phẩm mẫu hoàn chỉnh để bạn bấm thử từ đầu đến cuối.
+
+### Bước ① Sản phẩm & Kịch bản
+
+1. Nhập **Chủ đề kênh** (mỗi account một chủ đề — ví dụ "đồ gia dụng nhà bếp"). Chỉ cần gõ một lần, app lưu vĩnh viễn; mọi công cụ gợi ý sẽ tự bám theo ngách này.
+2. Trong **Gợi Ý Sản Phẩm Affiliate**, bấm **Gợi Ý Sản Phẩm** → mở từng ý tưởng xem lý do bán chạy → bấm **Dùng làm chủ đề** ở ý tưởng bạn chọn (app điền luôn cả tên sản phẩm vào chiến dịch, không phải gõ lại).
+3. Điền **Chiến Dịch Affiliate**: **Giá**, **Mã giảm giá**, **Shop / thương hiệu**, **Link affiliate**. Các giá trị này được giữ **nguyên văn 100%** — AI không bao giờ sửa chúng.
+4. Trong **Cài Đặt Kịch Bản Video**: chọn **Phong Cách Kịch Bản** hợp với ngành hàng (Làm đẹp, Nhà cửa, Vòng lặp rewatch…), rồi bấm nút **tạo kịch bản & từ khóa**. Muốn so nhiều bản mở đầu khác nhau → mở **Biến thể kịch bản A/B**, chọn bản ưng ý để nạp vào ô kịch bản.
+
+### Bước ② Copy & Tài sản
+
+Chọn nhóm ở ô **Chọn nhóm công cụ** (các nút sẽ mờ nếu Bước ① chưa có sản phẩm):
+
+- **✍️ Nội dung** — tạo **Câu Mở Đầu (Hook)** rồi bấm *Dùng cho kịch bản* hoặc **Gắn lên video** (in chữ hook to trong 3 giây đầu); kèm shot list chia cảnh và ước tính độ dài.
+- **📣 Mạng XH** — chọn công cụ trong ô **Chọn công cụ viết nội dung**: caption chuẩn tìm kiếm, trả lời bình luận, comment ghim, dòng công bố, khung giờ đăng, câu kêu lưu/chia sẻ, **Hỏi đáp chốt đơn** (soạn sẵn trả lời cho câu hỏi cản mua), **Phân tích đối thủ** (dán hook đối thủ vào ô, AI chỉ góc đã bão hòa + cách làm khác đi), **Phân tích hiệu quả** (dán số liệu video đã đăng), **Lịch nội dung** (3–14 ngày, một nút gửi cả tuần sang hàng loạt).
+- **🎬 Trên màn hình** — gợi ý nhạc trending, sticker chữ & CTA, chữ cho ảnh bìa.
+- **📦 Xuất** — bấm **Xuất Nội Dung** để tải toàn bộ những gì đã tạo (kịch bản, hook, campaign, caption…) về một file `.txt` — mở file này khi đăng TikTok là có đủ mọi thứ để dán.
+
+### Bước ③ Video & Phụ đề
+
+1. **Nguồn Video**: để mặc định Pexels (miễn phí), hoặc chọn *local* và tải video bạn tự quay sản phẩm (thật hơn, chuyển đổi tốt hơn).
+2. Chọn tỉ lệ **9:16 (dọc)** cho TikTok, số video muốn render, thời lượng mỗi cảnh.
+3. **Cài Đặt Âm Thanh**: chọn giọng Việt (ví dụ `vi-VN-HoaiMyNeural` nữ hoặc `NamMinh` nam — có nút nghe thử), tốc độ đọc, nhạc nền.
+4. **Cài Đặt Phụ Đề**: font Việt có sẵn (BeVietnamPro), cỡ chữ, vị trí, màu — có khung xem trước.
+
+### Bấm nút và nhận video
+
+1. Bấm nút **▶ Tạo Video** to màu cam cuối trang (đứng ở bước nào bấm cũng được).
+2. Theo dõi log chạy ngay trong trang; xong sẽ có khung xem video + thư mục chứa file tự mở.
+3. Bấm **Video mới** để dọn màn hình làm sản phẩm kế tiếp — app giữ lại chủ đề kênh, tên shop và danh sách hàng loạt, chỉ xóa nội dung của sản phẩm vừa xong.
+4. Đăng TikTok: dán caption + comment ghim từ file **📦 Xuất**, và **tự tay dán link affiliate thật** của bạn.
+
+### Khi muốn tăng sản lượng
+
+- **Chế độ hàng loạt** (cuối trang): mỗi dòng một sản phẩm, tùy chọn thêm `| giá | mã | link` — app render lần lượt từng video, kèm báo cáo `.txt` và caption riêng cho từng video nếu bật.
+- **Autopilot** (cuối trang): xem lịch sử các lần chạy tự động và tải báo cáo; cài lịch chạy tự động bằng cron như hướng dẫn ở mục trên.
 
 ## Video demo 📺
 
