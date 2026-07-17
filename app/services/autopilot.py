@@ -276,6 +276,9 @@ def run_autopilot(niche: str = "", language: str = "vi") -> dict:
 
     task_id = utils.get_uuid()
     params = build_video_params(subject, language=language)
+    # Product-library media is attached inside the render pipeline itself
+    # (task.preprocess_product_materials) so autopilot, WebUI, batch and the
+    # REST API all get it for free.
     # the render pipeline opens with two more LLM calls (script + terms)
     _cooldown()
     result = tm.start(task_id=task_id, params=params)

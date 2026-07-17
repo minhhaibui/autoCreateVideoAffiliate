@@ -8,7 +8,7 @@ from loguru import logger
 from app.config import config
 from app.models import const
 from app.models.schema import VideoConcatMode, VideoParams
-from app.services import export, llm, material, product_media, subtitle, video, voice, upload_post
+from app.services import export, llm, material, product_library, product_media, subtitle, video, voice, upload_post
 from app.services import state as sm
 from app.utils import utils
 
@@ -174,6 +174,16 @@ def preprocess_product_materials(params):
     reads those urls to pin the clips). Product media failing to preprocess
     must never fail the render: the video still works, it just falls back to
     stock-only. Returns [] when there is nothing to do."""
+    if not params.product_materials:
+        # Zero-manual-steps path: photos dropped ONCE into
+        # storage/product_library/<folder matching this subject>/ are staged
+        # and used automatically — WebUI, batch, API and autopilot alike.
+        try:
+            params.product_materials = product_library.stage_product_media(
+                params.video_subject or ""
+            )
+        except Exception as e:
+            logger.warning(f"product library lookup failed: {e}")
     if not params.product_materials:
         return []
     logger.info("\n\n## preprocess real product materials")
