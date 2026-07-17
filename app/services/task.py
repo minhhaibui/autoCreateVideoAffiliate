@@ -8,7 +8,7 @@ from loguru import logger
 from app.config import config
 from app.models import const
 from app.models.schema import VideoConcatMode, VideoParams
-from app.services import llm, material, product_media, subtitle, video, voice, upload_post
+from app.services import export, llm, material, product_media, subtitle, video, voice, upload_post
 from app.services import state as sm
 from app.utils import utils
 
@@ -404,6 +404,21 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
         f"task {task_id} finished, generated {len(final_video_paths)} videos."
     )
 
+    # 6b. TikTok-ready exports — renders are ~12 Mbps and routinely blow past
+    # the 10MB upload cap, which used to cost a manual ffmpeg pass per post.
+    # Never fatal: the full-size final always exists.
+    tiktok_ready_paths = []
+    for final_path in final_video_paths:
+        try:
+            base, ext = path.splitext(final_path)
+            ready = export.ensure_tiktok_ready(
+                final_path, f"{base}-tiktok{ext}", audio_duration
+            )
+            tiktok_ready_paths.append(ready)
+        except Exception as e:
+            logger.warning(f"tiktok-ready export failed for {final_path}: {e}")
+            tiktok_ready_paths.append(final_path)
+
     # 7. Cross-post to TikTok/Instagram (if enabled)
     cross_post_results = []
     if upload_post.upload_post_service.is_configured() and upload_post.upload_post_service.auto_upload:
@@ -422,6 +437,7 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
     kwargs = {
         "videos": final_video_paths,
         "combined_videos": combined_video_paths,
+        "tiktok_ready_videos": tiktok_ready_paths,
         "script": video_script,
         "terms": video_terms,
         "audio_file": audio_file,

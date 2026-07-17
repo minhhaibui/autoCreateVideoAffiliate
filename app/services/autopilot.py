@@ -214,7 +214,9 @@ def build_video_params(subject: str, language: str = "vi") -> VideoParams:
     )
 
 
-def format_report(product: dict, videos: list, metadata: dict, pinned: list) -> str:
+def format_report(
+    product: dict, videos: list, metadata: dict, pinned: list, ready_videos: list = None
+) -> str:
     """Deterministic plain-text bundle: what was rendered, where, and the
     ready-to-paste publish copy. Mirrors the batch report's shape."""
     lines = [
@@ -227,6 +229,10 @@ def format_report(product: dict, videos: list, metadata: dict, pinned: list) -> 
         lines.append(f"Angle: {product['angle']}")
     for v in videos:
         lines.append(f"Video: {v}")
+    # The <=10MB export is the file to actually upload (web upload cap).
+    for v in ready_videos or []:
+        if v not in videos:
+            lines.append(f"Upload-ready (<=10MB): {v}")
     metadata = metadata or {}
     if metadata.get("title"):
         lines.append(f"Title: {metadata['title']}")
@@ -312,7 +318,13 @@ def run_autopilot(niche: str = "", language: str = "vi") -> dict:
     except Exception as e:
         logger.warning(f"autopilot: publish copy failed, keeping the video: {e}")
 
-    report = format_report(product, videos, metadata, pinned)
+    report = format_report(
+        product,
+        videos,
+        metadata,
+        pinned,
+        ready_videos=(result or {}).get("tiktok_ready_videos") or [],
+    )
     report_path = os.path.join(utils.task_dir(task_id), REPORT_FILENAME)
     try:
         with open(report_path, "w", encoding="utf-8") as f:
