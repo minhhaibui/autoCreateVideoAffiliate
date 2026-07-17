@@ -39,6 +39,25 @@ class TestSaveConfigBackup(unittest.TestCase):
             self.assertTrue(os.path.isfile(fake_config))
             self.assertFalse(os.path.isfile(fake_config + ".bak"))
 
+    def test_identical_resave_does_not_rotate_the_backup(self):
+        """The WebUI saves on every rerun; unchanged content must be a no-op
+        so a good .bak survives until the config actually changes again."""
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_config = os.path.join(tmp, "config.toml")
+            with open(fake_config, "w", encoding="utf-8") as f:
+                f.write('[app]\npexels_api_keys = "PRECIOUS-KEY"\n')
+
+            with patch.object(config, "config_file", fake_config):
+                config.save_config()  # rotates: .bak = PRECIOUS-KEY version
+                first_bak_mtime = os.path.getmtime(fake_config + ".bak")
+                config.save_config()  # identical content -> must not touch disk
+                config.save_config()
+            self.assertEqual(
+                os.path.getmtime(fake_config + ".bak"), first_bak_mtime
+            )
+            with open(fake_config + ".bak", encoding="utf-8") as f:
+                self.assertIn("PRECIOUS-KEY", f.read())
+
     def test_backup_failure_never_blocks_the_save(self):
         with tempfile.TemporaryDirectory() as tmp:
             fake_config = os.path.join(tmp, "config.toml")

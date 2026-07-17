@@ -148,6 +148,23 @@ def load_config():
 
 
 def save_config():
+    _cfg["app"] = app
+    _cfg["azure"] = azure
+    _cfg["siliconflow"] = siliconflow
+    _cfg["ui"] = ui
+    new_content = toml.dumps(_cfg)
+
+    # No-op saves must not touch the disk: the WebUI saves on every rerun, and
+    # rotating the .bak on identical content would destroy the one good backup
+    # exactly when it is needed (a bad save followed by unchanged reruns).
+    try:
+        if os.path.isfile(config_file):
+            with open(config_file, "r", encoding="utf-8") as f:
+                if f.read() == new_content:
+                    return
+    except Exception as e:
+        logger.warning(f"failed to compare config before save: {e}")
+
     # Keep one rolling backup of the previous on-disk config BEFORE
     # overwriting. config.toml is gitignored, so a bad in-memory state being
     # persisted (e.g. a test blanking API keys — it happened, and a Pexels key
@@ -158,11 +175,7 @@ def save_config():
     except Exception as e:
         logger.warning(f"failed to write config backup before save: {e}")
     with open(config_file, "w", encoding="utf-8") as f:
-        _cfg["app"] = app
-        _cfg["azure"] = azure
-        _cfg["siliconflow"] = siliconflow
-        _cfg["ui"] = ui
-        f.write(toml.dumps(_cfg))
+        f.write(new_content)
 
 
 _cfg = load_config()
