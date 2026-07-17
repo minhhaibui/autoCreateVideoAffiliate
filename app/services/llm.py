@@ -1075,6 +1075,21 @@ def _coerce_keyed_dict(item, keys, required_keys, max_length: int) -> dict:
     return out
 
 
+def _language_line(keys, language: str, fallback_source: str = "the subject") -> str:
+    """Build the shared prompt constraint that pins the output language.
+
+    With ``language`` set it lists the ``keys`` explicitly ('Write the "a",
+    "b" and "c" fields in this language: X.'); otherwise it falls back to
+    matching ``fallback_source`` (the subject / the niche / the stats notes…).
+    Shared by every affiliate list generator so the wording stays identical.
+    """
+    if language:
+        quoted = [f'"{key}"' for key in keys]
+        listed = " and ".join(quoted) if len(quoted) <= 2 else ", ".join(quoted[:-1]) + " and " + quoted[-1]
+        return f"Write the {listed} fields in this language: {language}."
+    return f"Write every text field in the same language as {fallback_source}."
+
+
 def _normalize_hashtags(raw, count: int) -> List[str]:
     """
     将 LLM 返回的 hashtag 统一整理成 `#tag` 格式。
@@ -1628,11 +1643,7 @@ def generate_shot_list(
         if video_script
         else "No script was provided, so plan shots that would naturally tell this product's story."
     )
-    language_line = (
-        f'Write the "scene", "voiceover", "onscreen_text" and "broll" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the subject / script."
-    )
+    language_line = _language_line(SHOT_KEYS, language, "the subject / script")
 
     prompt = f"""
 # Role: TikTok Affiliate Video Director
@@ -1708,11 +1719,7 @@ def generate_comment_replies(
     )
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "comment" and "reply" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the subject."
-    )
+    language_line = _language_line(COMMENT_REPLY_KEYS, language)
 
     prompt = f"""
 # Role: TikTok Affiliate Community Manager
@@ -1785,11 +1792,7 @@ def generate_sound_ideas(
     )
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "sound", "vibe", "search" and "tip" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the subject."
-    )
+    language_line = _language_line(SOUND_KEYS, language)
 
     prompt = f"""
 # Role: TikTok Affiliate Sound Picker
@@ -1855,11 +1858,7 @@ def generate_text_stickers(
     )
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "text", "timing", "style" and "purpose" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the subject."
-    )
+    language_line = _language_line(STICKER_KEYS, language)
 
     prompt = f"""
 # Role: TikTok Affiliate On-screen Text & CTA Writer
@@ -1926,11 +1925,7 @@ def generate_cover_text_ideas(
     )
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "text", "subtext", "angle" and "tip" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the subject."
-    )
+    language_line = _language_line(COVER_KEYS, language)
 
     prompt = f"""
 # Role: TikTok Affiliate Cover / Thumbnail Headline Writer
@@ -2001,11 +1996,7 @@ def generate_posting_schedule(
     )
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "slot", "day", "time" and "why" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the subject."
-    )
+    language_line = _language_line(SCHEDULE_KEYS, language)
     region_line = (
         f"Tune the windows to this audience region / timezone: {audience_region}."
         if audience_region
@@ -2078,11 +2069,7 @@ def generate_pinned_comments(
     )
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "comment", "cta" and "tip" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the subject."
-    )
+    language_line = _language_line(PINNED_COMMENT_KEYS, language)
 
     prompt = f"""
 # Role: TikTok Affiliate Pinned-Comment Writer
@@ -2151,11 +2138,7 @@ def generate_disclosure_lines(
     )
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "line", "placement" and "note" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the subject."
-    )
+    language_line = _language_line(DISCLOSURE_KEYS, language)
 
     prompt = f"""
 # Role: Short-Video Affiliate Disclosure & Compliance Writer
@@ -2225,11 +2208,7 @@ def generate_save_share_prompts(
     )
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "line", "signal", "placement" and "why" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the subject."
-    )
+    language_line = _language_line(SAVE_BAIT_KEYS, language)
 
     prompt = f"""
 # Role: Short-Video Save & Share Prompt Writer
@@ -2302,11 +2281,7 @@ def generate_buyer_qa(
     )
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "question", "reply" and "goal" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the subject."
-    )
+    language_line = _language_line(BUYER_QA_KEYS, language)
 
     prompt = f"""
 # Role: Short-Video Commerce Comment Closer
@@ -2382,11 +2357,7 @@ def generate_performance_review(
     )
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "insight", "evidence" and "action" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the stats notes."
-    )
+    language_line = _language_line(PERFORMANCE_KEYS, language, "the stats notes")
 
     prompt = f"""
 # Role: TikTok Affiliate Performance Analyst
@@ -2469,11 +2440,7 @@ def generate_competitor_analysis(
     product = _clamp_text(product, MAX_SOCIAL_SUBJECT_LENGTH).strip()
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "pattern", "why_it_works" and "your_move" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the pasted competitor content."
-    )
+    language_line = _language_line(COMPETITOR_KEYS, language, "the pasted competitor content")
     product_line = (
         f'The creator promotes this product: "{product}". Make every "your_move" a concrete angle for THIS product.'
         if product
@@ -2553,11 +2520,7 @@ def generate_content_calendar(
     niche = (niche or "").strip()
     language = (language or "").strip()
 
-    language_line = (
-        f'Write the "subject", "angle" and "goal" fields in this language: {language}.'
-        if language
-        else "Write every text field in the same language as the niche."
-    )
+    language_line = _language_line(("subject", "angle", "goal"), language, "the niche")
 
     prompt = f"""
 # Role: TikTok Affiliate Content Planner

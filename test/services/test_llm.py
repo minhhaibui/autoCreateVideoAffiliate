@@ -2021,5 +2021,47 @@ class TestGenerateTerms(unittest.TestCase):
         self.assertEqual(terms, [])
 
 
+class TestLanguageLine(unittest.TestCase):
+    """_language_line must reproduce the exact wording the 13 generators used
+    before it was factored out — the prompts must not drift."""
+
+    def test_four_keys_with_language(self):
+        self.assertEqual(
+            llm._language_line(llm.SCHEDULE_KEYS, "vi"),
+            'Write the "slot", "day", "time" and "why" fields in this language: vi.',
+        )
+
+    def test_three_keys_with_language(self):
+        self.assertEqual(
+            llm._language_line(llm.PINNED_COMMENT_KEYS, "en"),
+            'Write the "comment", "cta" and "tip" fields in this language: en.',
+        )
+
+    def test_two_keys_join_with_and_only(self):
+        self.assertEqual(
+            llm._language_line(llm.COMMENT_REPLY_KEYS, "ru"),
+            'Write the "comment" and "reply" fields in this language: ru.',
+        )
+
+    def test_empty_language_uses_default_fallback(self):
+        self.assertEqual(
+            llm._language_line(llm.SCHEDULE_KEYS, ""),
+            "Write every text field in the same language as the subject.",
+        )
+
+    def test_empty_language_uses_custom_fallback_source(self):
+        self.assertEqual(
+            llm._language_line(llm.PERFORMANCE_KEYS, "", "the stats notes"),
+            "Write every text field in the same language as the stats notes.",
+        )
+
+    def test_language_wins_over_custom_fallback(self):
+        line = llm._language_line(llm.COMPETITOR_KEYS, "vi", "the pasted competitor content")
+        self.assertEqual(
+            line,
+            'Write the "pattern", "why_it_works" and "your_move" fields in this language: vi.',
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
