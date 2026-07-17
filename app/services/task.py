@@ -206,15 +206,27 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
         return product_media.weave_product_items(product_paths, local_paths)
     else:
         logger.info(f"\n\n## downloading videos from {params.video_source}")
-        downloaded_videos = material.download_videos(
-            task_id=task_id,
-            search_terms=video_terms,
-            source=params.video_source,
-            video_aspect=params.video_aspect,
-            video_contact_mode=params.video_concat_mode,
-            audio_duration=audio_duration * params.video_count,
-            max_clip_duration=params.video_clip_duration,
-        )
+        try:
+            downloaded_videos = material.download_videos(
+                task_id=task_id,
+                search_terms=video_terms,
+                source=params.video_source,
+                video_aspect=params.video_aspect,
+                video_contact_mode=params.video_concat_mode,
+                audio_duration=audio_duration * params.video_count,
+                max_clip_duration=params.video_clip_duration,
+            )
+        except Exception as e:
+            # A missing source API key raises (material.get_api_key) instead of
+            # returning []. Without product media that failure is fatal as
+            # before — but with real product clips in hand we can still render
+            # a product-only video rather than fail the task.
+            if not product_paths:
+                raise
+            logger.warning(
+                f"stock download failed ({e}); rendering with product media only"
+            )
+            downloaded_videos = []
         if not downloaded_videos and not product_paths:
             sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
             logger.error(

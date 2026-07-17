@@ -163,6 +163,30 @@ class TestProductMaterials(unittest.TestCase):
         self.assertEqual(result, ["p.mp4"])
         mock_state.assert_not_called()
 
+    def test_stock_download_raising_with_product_media_still_renders(self):
+        # material.get_api_key RAISES on a missing source key — with product
+        # media that must degrade to product-only, not crash the task.
+        params = VideoParams(
+            video_subject="x",
+            video_source="pexels",
+            product_materials=[MaterialInfo(provider="local", url="p.jpg")],
+        )
+        processed = [MaterialInfo(provider="local", url="p.mp4")]
+        with patch.object(tm.video, "preprocess_video", return_value=processed), patch.object(
+            tm.material, "download_videos", side_effect=ValueError("pexels_api_keys is not set")
+        ), patch.object(tm.sm.state, "update_task") as mock_state:
+            result = tm.get_video_materials("tid", params, ["term"], 30)
+        self.assertEqual(result, ["p.mp4"])
+        mock_state.assert_not_called()
+
+    def test_stock_download_raising_without_product_media_propagates(self):
+        params = VideoParams(video_subject="x", video_source="pexels")
+        with patch.object(
+            tm.material, "download_videos", side_effect=ValueError("pexels_api_keys is not set")
+        ):
+            with self.assertRaises(ValueError):
+                tm.get_video_materials("tid", params, ["term"], 30)
+
     def test_stock_download_failure_without_product_media_fails_task(self):
         params = VideoParams(video_subject="x", video_source="pexels")
         with patch.object(
