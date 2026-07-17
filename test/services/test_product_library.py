@@ -128,6 +128,21 @@ class TestStageProductMedia(unittest.TestCase):
         self.assertIn("lib-noi chien khong dau-a.jpg", materials[0].url)
 
 
+class TestListFolderMedia(unittest.TestCase):
+    def test_media_sorted_and_non_media_excluded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for name in ["b.png", "a.jpg", "link.txt", "HUONG-DAN.txt", "c.mov"]:
+                with open(os.path.join(tmp, name), "wb") as f:
+                    f.write(b"x")
+            self.assertEqual(
+                product_library.list_folder_media(tmp), ["a.jpg", "b.png", "c.mov"]
+            )
+
+    def test_missing_or_empty_folder(self):
+        self.assertEqual(product_library.list_folder_media(""), [])
+        self.assertEqual(product_library.list_folder_media("/no/such/dir"), [])
+
+
 class TestReadProductLink(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

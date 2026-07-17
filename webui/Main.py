@@ -43,6 +43,11 @@ from app.services.campaign import (
 from app.services.fonts import get_recommended_font
 from app.services.preflight import is_llm_ready
 from app.services.preview import render_subtitle_preview
+from app.services.product_library import (
+    find_product_folder,
+    list_folder_media,
+    read_product_link,
+)
 from app.services.providers import fetch_groq_model_ids
 from app.services.onboarding import (
     apply_new_video_reset,
@@ -455,6 +460,18 @@ def _sync_campaign_product_from_subject():
     — once the user edits it, their wording is never overwritten. The logic is
     unit-tested in onboarding.fill_empty_product_from_subject."""
     fill_empty_product_from_subject(st.session_state)
+    # Same fill-only-when-empty rule for the affiliate link: if the product
+    # library has a link.txt for this subject, load the user's saved link so
+    # the campaign / CTA / Export Copy carry it without retyping. A typed
+    # link is never overwritten (read_product_link is unit-tested).
+    if not st.session_state.get("campaign_link"):
+        try:
+            saved_link = read_product_link(st.session_state.get("video_subject", ""))
+        except Exception:
+            saved_link = ""
+        if saved_link:
+            st.session_state["campaign_link"] = saved_link
+            st.toast(tr("Campaign Link From Library"))
 
 
 def _burn_hook(index):
@@ -2411,6 +2428,17 @@ with step3:
                     count=len(st.session_state["product_media_materials"])
                 )
             )
+        elif not uploaded_product_files and params.video_subject:
+            # Transparency for the zero-manual-steps path: tell the user their
+            # product library will kick in for this subject before they render.
+            _lib_folder = find_product_folder(params.video_subject)
+            _lib_count = len(list_folder_media(_lib_folder)) if _lib_folder else 0
+            if _lib_count:
+                st.caption(
+                    tr("Product Library Will Be Used").format(
+                        count=_lib_count, folder=os.path.basename(_lib_folder)
+                    )
+                )
 
         selected_index = st.selectbox(
             tr("Video Concat Mode"),

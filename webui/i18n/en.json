@@ -148,6 +148,8 @@
     "Upload Product Media": "📸 Real product photos/videos (recommended)",
     "Product Media Help": "Upload real photos or clips of THIS product — e.g. the shop listing's photos of a model wearing the outfit. The video will open with the product and weave it between the stock clips, so viewers actually see what you're selling.",
     "Product Media Reused": "Reusing {count} product media file(s) from the last upload. Press 🆕 New video to clear them.",
+    "Product Library Will Be Used": "📚 Your product library matches: {count} file(s) from \"{folder}\" will be woven into this video automatically.",
+    "Campaign Link From Library": "Affiliate link loaded from your product library",
     "Play Voice": "Play Voice",
     "Voice Example": "This is an example text for testing speech synthesis",
     "Synthesizing Voice": "Synthesizing voice, please wait...",

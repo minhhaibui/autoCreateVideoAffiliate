@@ -148,6 +148,8 @@
     "Upload Product Media": "📸 Ảnh/video sản phẩm thật (nên dùng)",
     "Product Media Help": "Tải ảnh hoặc video thật của CHÍNH sản phẩm này — ví dụ ảnh người mẫu mặc bộ đồ lấy từ trang shop. Video sẽ mở đầu bằng sản phẩm và rải đều nó giữa các cảnh quay, để người xem thấy tận mắt món bạn đang bán.",
     "Product Media Reused": "Đang dùng lại {count} ảnh/video sản phẩm từ lần tải trước. Bấm 🆕 New video để xóa.",
+    "Product Library Will Be Used": "📚 Khớp thư viện sản phẩm: {count} ảnh/video từ thư mục \"{folder}\" sẽ tự được dệt vào video này.",
+    "Campaign Link From Library": "Đã nạp link affiliate từ thư viện sản phẩm",
     "Play Voice": "Phát Giọng Nói",
     "Voice Example": "Đây là văn bản mẫu để kiểm tra tổng hợp giọng nói",
     "Synthesizing Voice": "Đang tổng hợp giọng nói, vui lòng đợi...",

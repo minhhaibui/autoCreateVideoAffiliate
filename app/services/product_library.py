@@ -139,6 +139,19 @@ def read_product_link(product_name: str) -> str:
     return ""
 
 
+def list_folder_media(folder: str) -> list:
+    """Sorted media filenames inside a library folder (guide/link files and
+    other non-media entries excluded)."""
+    if not folder or not os.path.isdir(folder):
+        return []
+    return [
+        name
+        for name in sorted(os.listdir(folder))
+        if utils.parse_extension(name) in MEDIA_EXTENSIONS
+        and os.path.isfile(os.path.join(folder, name))
+    ]
+
+
 def stage_product_media(product_name: str) -> list:
     """Copy the matched folder's media into storage/product_media (the
     render pipeline's trusted directory) and return MaterialInfo entries.
@@ -155,13 +168,8 @@ def stage_product_media(product_name: str) -> list:
     staging_dir = utils.storage_dir("product_media", create=True)
     prefix = f"lib-{os.path.basename(folder)}"
     materials = []
-    for name in sorted(os.listdir(folder)):
-        ext = utils.parse_extension(name)
-        if ext not in MEDIA_EXTENSIONS:
-            continue
+    for name in list_folder_media(folder):
         src = os.path.join(folder, name)
-        if not os.path.isfile(src):
-            continue
         dst = os.path.join(staging_dir, f"{prefix}-{name}")
         try:
             shutil.copyfile(src, dst)
