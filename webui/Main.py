@@ -1,7 +1,7 @@
 import os
 import sys
 import webbrowser
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import streamlit as st
 from loguru import logger
@@ -267,17 +267,11 @@ def get_all_songs():
 
 def open_task_folder(task_id):
     try:
-        # task_id 应始终是服务端生成的 UUID。这里先做格式校验，避免异常值
-        # 通过路径拼接访问任务目录之外的位置，也避免后续打开目录时触发
-        # 平台 shell 对特殊字符的解释。
-        normalized_task_id = str(UUID(str(task_id)))
-        tasks_root = os.path.abspath(os.path.join(root_dir, "storage", "tasks"))
-        path = os.path.abspath(os.path.join(tasks_root, normalized_task_id))
-
-        # 即使 UUID 校验通过，也再次确认最终路径仍在任务根目录内，避免
-        # 未来调用方调整 task_id 来源时引入路径穿越风险。
-        if not path.startswith(tasks_root + os.sep):
-            logger.warning(f"invalid task folder path: {path}")
+        # UUID validation + stay-inside-tasks-root guard live (and are
+        # unit-tested) in utils.resolve_task_folder.
+        path = utils.resolve_task_folder(task_id)
+        if path is None:
+            logger.warning(f"invalid task folder id: {task_id}")
             return
 
         if os.path.isdir(path):

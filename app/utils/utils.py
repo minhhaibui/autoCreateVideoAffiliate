@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 import threading
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from loguru import logger
 
@@ -309,3 +309,25 @@ def load_locales(i18n_dir):
 
 def parse_extension(filename):
     return Path(filename).suffix.lower().lstrip('.')
+
+
+def resolve_task_folder(task_id, tasks_root: str = ""):
+    """Validate ``task_id`` as a UUID and resolve it to a folder path inside
+    the tasks root, or return None.
+
+    task_id should always be a server-generated UUID; validating the format
+    (and re-checking the joined path stays inside the root) stops crafted
+    values from escaping the tasks directory via path traversal. Extracted
+    from the WebUI's open-folder button so the guard is unit-testable; unlike
+    task_dir() this never creates directories.
+    """
+    try:
+        normalized_task_id = str(UUID(str(task_id)))
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+    root = os.path.abspath(tasks_root or os.path.join(storage_dir(), "tasks"))
+    path = os.path.abspath(os.path.join(root, normalized_task_id))
+    if not path.startswith(root + os.sep):
+        return None
+    return path
