@@ -8,7 +8,7 @@ from loguru import logger
 from app.config import config
 from app.models import const
 from app.models.schema import VideoConcatMode, VideoParams
-from app.services import llm, material, subtitle, video, voice, upload_post
+from app.services import llm, material, product_media, subtitle, video, voice, upload_post
 from app.services import state as sm
 from app.utils import utils
 
@@ -167,19 +167,43 @@ def generate_subtitle(task_id, params, video_script, sub_maker, audio_file):
     return subtitle_path
 
 
+def preprocess_product_materials(params):
+    """Turn the uploaded real-product photos/clips into video-ready files and
+    return their paths (photos become zoom clips via video.preprocess_video,
+    which rewrites each material's url in place — generate_final_videos later
+    reads those urls to pin the clips). Product media failing to preprocess
+    must never fail the render: the video still works, it just falls back to
+    stock-only. Returns [] when there is nothing to do."""
+    if not params.product_materials:
+        return []
+    logger.info("\n\n## preprocess real product materials")
+    try:
+        processed = video.preprocess_video(
+            materials=params.product_materials,
+            clip_duration=params.video_clip_duration,
+            materials_dir=utils.storage_dir("product_media", create=True),
+        )
+    except Exception as e:
+        logger.warning(f"failed to preprocess product materials, continuing with stock only: {e}")
+        return []
+    return [m.url for m in (processed or []) if m.url]
+
+
 def get_video_materials(task_id, params, video_terms, audio_duration):
+    product_paths = preprocess_product_materials(params)
     if params.video_source == "local":
         logger.info("\n\n## preprocess local materials")
         materials = video.preprocess_video(
             materials=params.video_materials, clip_duration=params.video_clip_duration
         )
-        if not materials:
+        if not materials and not product_paths:
             sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
             logger.error(
                 "no valid materials found, please check the materials and try again."
             )
             return None
-        return [material_info.url for material_info in materials]
+        local_paths = [material_info.url for material_info in (materials or [])]
+        return product_media.weave_product_items(product_paths, local_paths)
     else:
         logger.info(f"\n\n## downloading videos from {params.video_source}")
         downloaded_videos = material.download_videos(
@@ -191,13 +215,15 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
             audio_duration=audio_duration * params.video_count,
             max_clip_duration=params.video_clip_duration,
         )
-        if not downloaded_videos:
+        if not downloaded_videos and not product_paths:
             sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
             logger.error(
                 "failed to download videos, maybe the network is not available. if you are in China, please use a VPN."
             )
             return None
-        return downloaded_videos
+        return product_media.weave_product_items(
+            product_paths, downloaded_videos or []
+        )
 
 
 def generate_final_videos(
@@ -217,6 +243,12 @@ def generate_final_videos(
             utils.task_dir(task_id), f"combined-{index}.mp4"
         )
         logger.info(f"\n\n## combining video: {index} => {combined_video_path}")
+        # Product materials were preprocessed in-place, so their urls now
+        # point at the video-ready files — pin those so the real product
+        # opens the video and reappears evenly, surviving the random shuffle.
+        pinned_paths = [
+            m.url for m in (params.product_materials or []) if m.url
+        ]
         video.combine_videos(
             combined_video_path=combined_video_path,
             video_paths=downloaded_videos,
@@ -226,6 +258,7 @@ def generate_final_videos(
             video_transition_mode=video_transition_mode,
             max_clip_duration=params.video_clip_duration,
             threads=params.n_threads,
+            pinned_paths=pinned_paths,
         )
 
         _progress += 50 / params.video_count / 2

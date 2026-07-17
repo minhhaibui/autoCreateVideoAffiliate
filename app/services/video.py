@@ -34,6 +34,7 @@ from app.models.schema import (
     VideoParams,
     VideoTransitionMode,
 )
+from app.services import product_media
 from app.services.utils import video_effects
 from app.utils import file_security, utils
 
@@ -122,6 +123,36 @@ def _prioritize_unique_source_clips(
         f"fallback clips: {len(overflow_items)}"
     )
     return primary_items + overflow_items
+
+
+def _pin_product_subclips(
+    subclipped_items: List[SubClippedVideoClip],
+    pinned_paths: List[str] = None,
+) -> List[SubClippedVideoClip]:
+    """Reorder subclips so clips cut from the pinned (real product) sources
+    open the video and are woven evenly between the other clips.
+
+    Runs AFTER _prioritize_unique_source_clips, so in random mode it restores
+    a deterministic slot for the product media that the shuffle would
+    otherwise scatter (or bury). No pinned paths → list returned unchanged.
+    """
+    if not pinned_paths or not subclipped_items:
+        return subclipped_items
+
+    pinned_set = set(pinned_paths)
+    pinned_items = [
+        item for item in subclipped_items if item.source_file_path in pinned_set
+    ]
+    if not pinned_items:
+        return subclipped_items
+    other_items = [
+        item for item in subclipped_items if item.source_file_path not in pinned_set
+    ]
+    logger.info(
+        f"pinning product media: {len(pinned_items)} product clips woven into "
+        f"{len(other_items)} stock clips (first clip = product)"
+    )
+    return product_media.weave_product_items(pinned_items, other_items)
 
 
 def get_ffmpeg_binary():
@@ -507,6 +538,7 @@ def combine_videos(
     video_transition_mode: VideoTransitionMode = None,
     max_clip_duration: int = 5,
     threads: int = 2,
+    pinned_paths: List[str] = None,
 ) -> str:
     audio_clip = AudioFileClip(audio_file)
     try:
@@ -562,6 +594,10 @@ def combine_videos(
         subclipped_items=subclipped_items,
         concat_mode=video_concat_mode,
     )
+
+    # Real product media must actually be SEEN: re-order after the shuffle so
+    # a pinned (product) clip opens the video and the rest spread out evenly.
+    subclipped_items = _pin_product_subclips(subclipped_items, pinned_paths)
         
     logger.debug(f"total subclipped items: {len(subclipped_items)}")
     
@@ -1179,14 +1215,17 @@ def generate_video(
     del video_clip
 
 
-def preprocess_video(materials: List[MaterialInfo], clip_duration=4):
+def preprocess_video(materials: List[MaterialInfo], clip_duration=4, materials_dir: str = ""):
     # WebUI 在某些二次生成场景下可能传入空素材列表，这里直接返回空结果，避免抛出 NoneType 异常。
     if not materials:
         return []
 
     # 仅返回通过预处理校验的素材，避免低分辨率图片继续进入后续的视频合成流程。
     valid_materials = []
-    local_videos_dir = utils.storage_dir("local_videos", create=True)
+    # Default whitelist stays the local-materials folder; real-product media
+    # lives in its own storage dir and passes it explicitly — every caller is
+    # still locked to exactly one dedicated directory.
+    local_videos_dir = materials_dir or utils.storage_dir("local_videos", create=True)
 
     for material in materials:
         if not material.url:

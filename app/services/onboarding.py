@@ -75,6 +75,12 @@ NEW_VIDEO_ASSET_KEYS = (
     "text_stickers",
     "cover_ideas",
     "last_video_result",
+    # Real product media is per-product like the affiliate link: weaving
+    # product A's photos into product B's video is a silent, damaging error.
+    # Pop the uploader widget's own key too, or the stale upload re-saves
+    # itself on the next rerun.
+    "product_media_materials",
+    "product_media_uploader",
 )
 
 # Account-level / cross-video state that "New video" must NEVER clear: the

@@ -658,5 +658,55 @@ class TestVideoService(unittest.TestCase):
         finally:
             clip.close()
 
+
+class TestPinProductSubclips(unittest.TestCase):
+    """_pin_product_subclips must put a real-product clip first and weave the
+    rest between the stock clips, surviving the random-mode shuffle."""
+
+    @staticmethod
+    def item(source, start=0, end=4):
+        return vd.SubClippedVideoClip(
+            file_path=source,
+            start_time=start,
+            end_time=end,
+            width=1080,
+            height=1920,
+            source_file_path=source,
+        )
+
+    def test_no_pinned_paths_returns_unchanged(self):
+        items = [self.item("s1.mp4"), self.item("s2.mp4")]
+        self.assertIs(vd._pin_product_subclips(items, None), items)
+        self.assertIs(vd._pin_product_subclips(items, []), items)
+
+    def test_empty_items_returns_unchanged(self):
+        self.assertEqual(vd._pin_product_subclips([], ["p.mp4"]), [])
+
+    def test_pinned_sources_absent_returns_unchanged(self):
+        items = [self.item("s1.mp4")]
+        self.assertIs(vd._pin_product_subclips(items, ["p.mp4"]), items)
+
+    def test_product_clip_moves_to_front(self):
+        items = [self.item("s1.mp4"), self.item("s2.mp4"), self.item("p.mp4")]
+        pinned = vd._pin_product_subclips(items, ["p.mp4"])
+        self.assertEqual(pinned[0].source_file_path, "p.mp4")
+        self.assertEqual(len(pinned), 3)
+
+    def test_multiple_product_clips_are_woven(self):
+        items = [
+            self.item("s1.mp4"),
+            self.item("p1.mp4"),
+            self.item("s2.mp4"),
+            self.item("s3.mp4"),
+            self.item("p2.mp4"),
+            self.item("s4.mp4"),
+        ]
+        pinned = vd._pin_product_subclips(items, ["p1.mp4", "p2.mp4"])
+        sources = [i.source_file_path for i in pinned]
+        self.assertEqual(sources[0], "p1.mp4")
+        self.assertIn("p2.mp4", sources[1:-1])
+        self.assertEqual(sorted(sources), sorted(s.source_file_path for s in items))
+
+
 if __name__ == "__main__":
     unittest.main() 

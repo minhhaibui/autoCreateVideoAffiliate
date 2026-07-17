@@ -83,6 +83,11 @@ class VideoParams(BaseModel):
     video_materials: Optional[List[MaterialInfo]] = (
         None  # Materials used to generate the video
     )
+    product_materials: Optional[List[MaterialInfo]] = (
+        None  # Real photos/clips of the affiliate product itself; they open the
+        # video and are woven between the stock clips so the product is
+        # actually seen on screen
+    )
     
     custom_audio_file: Optional[str] = None  # Custom audio file path, will ignore video_script and disable subtitle
     video_language: Optional[str] = ""  # auto detect

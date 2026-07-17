@@ -198,6 +198,10 @@ if "ui_language" not in st.session_state:
 if "local_video_materials" not in st.session_state:
     # 记住用户最近一次已经落盘的本地素材，避免仅修改文案后二次生成时丢失素材列表。
     st.session_state["local_video_materials"] = []
+if "product_media_materials" not in st.session_state:
+    # Remember the last saved-to-disk real-product media so a rerun (or a
+    # copy-only regeneration) doesn't silently drop the product from the video.
+    st.session_state["product_media_materials"] = []
 if "campaign_shop" not in st.session_state:
     # Account-level: one shop per account, seeded once from config so it is not
     # retyped every video (the on_change callback keeps config in sync).
@@ -924,6 +928,7 @@ llm_provider = config.app.get("llm_provider", "").lower()
 
 params = VideoParams(video_subject="")
 uploaded_files = []
+uploaded_product_files = []
 uploaded_audio_file = None
 
 # Three-step wizard. st.tabs runs EVERY tab body on each rerun (it only hides the
@@ -2387,6 +2392,26 @@ with step3:
                 accept_multiple_files=True,
             )
 
+        # Real product media — works with EVERY source, not just local: the
+        # affiliate video must actually show the product (e.g. the listing's
+        # photos of a model wearing the outfit). The first product clip opens
+        # the video and the rest are woven evenly between the stock clips.
+        product_file_types = ["mp4", "mov", "jpg", "jpeg", "png"]
+        uploaded_product_files = st.file_uploader(
+            tr("Upload Product Media"),
+            type=product_file_types
+            + [file_type.upper() for file_type in product_file_types],
+            accept_multiple_files=True,
+            key="product_media_uploader",
+            help=tr("Product Media Help"),
+        )
+        if not uploaded_product_files and st.session_state["product_media_materials"]:
+            st.caption(
+                tr("Product Media Reused").format(
+                    count=len(st.session_state["product_media_materials"])
+                )
+            )
+
         selected_index = st.selectbox(
             tr("Video Concat Mode"),
             index=1,
@@ -3118,6 +3143,42 @@ if start_button:
             m.duration = material.get("duration", 0)
             if m.url:
                 params.video_materials.append(m)
+
+    if uploaded_product_files:
+        product_media_dir = utils.storage_dir("product_media", create=True)
+        # Same freshness rule as local materials: this upload IS the product
+        # media set — never append to a previous product's files.
+        params.product_materials = []
+        persisted_product_materials = []
+        for file in uploaded_product_files:
+            file_path = os.path.join(
+                product_media_dir, f"{file.file_id}_{file.name}"
+            )
+            with open(file_path, "wb") as f:
+                f.write(file.getbuffer())
+            m = MaterialInfo()
+            m.provider = "local"
+            m.url = file_path
+            params.product_materials.append(m)
+            persisted_product_materials.append(
+                {
+                    "provider": m.provider,
+                    "url": m.url,
+                    "duration": m.duration,
+                }
+            )
+        st.session_state["product_media_materials"] = persisted_product_materials
+    elif st.session_state["product_media_materials"]:
+        # Reuse the last saved product media when the user only tweaked the
+        # copy — skip files that were deleted from disk in the meantime.
+        params.product_materials = []
+        for material in st.session_state["product_media_materials"]:
+            m = MaterialInfo()
+            m.provider = material.get("provider", "local")
+            m.url = material.get("url", "")
+            m.duration = material.get("duration", 0)
+            if m.url and os.path.exists(m.url):
+                params.product_materials.append(m)
 
     log_container = st.empty()
     log_records = []

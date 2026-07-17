@@ -1,6 +1,7 @@
 import unittest
 import os
 import sys
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -101,7 +102,107 @@ class TestTaskService(unittest.TestCase):
         )
         result = tm.start(task_id=task_id, params=params)
         print(result)
-    
+
+
+class TestProductMaterials(unittest.TestCase):
+    """Real product media must open the video, weave into stock, and never
+    make a render fail that would otherwise succeed."""
+
+    def test_no_product_materials_returns_empty(self):
+        params = VideoParams(video_subject="x")
+        self.assertEqual(tm.preprocess_product_materials(params), [])
+
+    def test_preprocess_returns_video_ready_urls_from_product_dir(self):
+        params = VideoParams(
+            video_subject="x",
+            product_materials=[MaterialInfo(provider="local", url="p.jpg")],
+        )
+        processed = [MaterialInfo(provider="local", url="p.jpg.mp4")]
+        with patch.object(
+            tm.video, "preprocess_video", return_value=processed
+        ) as mock_pre:
+            self.assertEqual(tm.preprocess_product_materials(params), ["p.jpg.mp4"])
+        self.assertTrue(
+            mock_pre.call_args.kwargs["materials_dir"].endswith("product_media")
+        )
+
+    def test_preprocess_failure_never_fails_the_render(self):
+        params = VideoParams(
+            video_subject="x",
+            product_materials=[MaterialInfo(provider="local", url="p.jpg")],
+        )
+        with patch.object(
+            tm.video, "preprocess_video", side_effect=RuntimeError("boom")
+        ):
+            self.assertEqual(tm.preprocess_product_materials(params), [])
+
+    def test_online_source_weaves_product_clip_first(self):
+        params = VideoParams(
+            video_subject="x",
+            video_source="pexels",
+            product_materials=[MaterialInfo(provider="local", url="p.jpg")],
+        )
+        processed = [MaterialInfo(provider="local", url="p.mp4")]
+        with patch.object(tm.video, "preprocess_video", return_value=processed), patch.object(
+            tm.material, "download_videos", return_value=["s1.mp4", "s2.mp4"]
+        ):
+            result = tm.get_video_materials("tid", params, ["term"], 30)
+        self.assertEqual(result, ["p.mp4", "s1.mp4", "s2.mp4"])
+
+    def test_stock_download_failure_with_product_media_still_renders(self):
+        params = VideoParams(
+            video_subject="x",
+            video_source="pexels",
+            product_materials=[MaterialInfo(provider="local", url="p.jpg")],
+        )
+        processed = [MaterialInfo(provider="local", url="p.mp4")]
+        with patch.object(tm.video, "preprocess_video", return_value=processed), patch.object(
+            tm.material, "download_videos", return_value=[]
+        ), patch.object(tm.sm.state, "update_task") as mock_state:
+            result = tm.get_video_materials("tid", params, ["term"], 30)
+        self.assertEqual(result, ["p.mp4"])
+        mock_state.assert_not_called()
+
+    def test_stock_download_failure_without_product_media_fails_task(self):
+        params = VideoParams(video_subject="x", video_source="pexels")
+        with patch.object(
+            tm.material, "download_videos", return_value=[]
+        ), patch.object(tm.sm.state, "update_task") as mock_state:
+            result = tm.get_video_materials("tid", params, ["term"], 30)
+        self.assertIsNone(result)
+        mock_state.assert_called_once()
+
+    def test_generate_final_videos_pins_product_urls(self):
+        params = VideoParams(
+            video_subject="x",
+            video_count=1,
+            product_materials=[
+                MaterialInfo(provider="local", url="p.mp4"),
+                MaterialInfo(provider="local", url=""),
+            ],
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(tm.utils, "task_dir", return_value=tmp), patch.object(
+                tm.video, "combine_videos"
+            ) as mock_combine, patch.object(tm.video, "generate_video"), patch.object(
+                tm.sm.state, "update_task"
+            ):
+                tm.generate_final_videos(
+                    "tid", params, ["p.mp4", "s1.mp4"], "a.mp3", "s.srt"
+                )
+        self.assertEqual(mock_combine.call_args.kwargs["pinned_paths"], ["p.mp4"])
+
+    def test_generate_final_videos_without_product_pins_nothing(self):
+        params = VideoParams(video_subject="x", video_count=1)
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(tm.utils, "task_dir", return_value=tmp), patch.object(
+                tm.video, "combine_videos"
+            ) as mock_combine, patch.object(tm.video, "generate_video"), patch.object(
+                tm.sm.state, "update_task"
+            ):
+                tm.generate_final_videos("tid", params, ["s1.mp4"], "a.mp3", "s.srt")
+        self.assertEqual(mock_combine.call_args.kwargs["pinned_paths"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
