@@ -20,7 +20,7 @@ from loguru import logger
 
 from app.config import config
 from app.models.schema import VideoParams
-from app.services import llm
+from app.services import llm, product_library
 from app.services import task as tm
 from app.services.preflight import is_llm_ready
 from app.utils import utils
@@ -215,7 +215,12 @@ def build_video_params(subject: str, language: str = "vi") -> VideoParams:
 
 
 def format_report(
-    product: dict, videos: list, metadata: dict, pinned: list, ready_videos: list = None
+    product: dict,
+    videos: list,
+    metadata: dict,
+    pinned: list,
+    ready_videos: list = None,
+    affiliate_link: str = "",
 ) -> str:
     """Deterministic plain-text bundle: what was rendered, where, and the
     ready-to-paste publish copy. Mirrors the batch report's shape."""
@@ -244,8 +249,16 @@ def format_report(
     first_pinned = (pinned[0] if pinned else {}) or {}
     if first_pinned.get("comment"):
         lines.append(f"Pinned: {first_pinned['comment']}")
-    lines.append("NOTE: add your real affiliate link to the pinned comment "
-                 "before publishing — autopilot never invents links.")
+    if affiliate_link:
+        # User-authored link from the product library's link.txt — relayed
+        # verbatim, never invented.
+        lines.append(f"Affiliate link (from your product library): {affiliate_link}")
+        lines.append(
+            "NOTE: pinned comment + link above are ready to paste together."
+        )
+    else:
+        lines.append("NOTE: add your real affiliate link to the pinned comment "
+                     "before publishing — autopilot never invents links.")
     return "\n".join(lines)
 
 
@@ -321,12 +334,18 @@ def run_autopilot(niche: str = "", language: str = "vi") -> dict:
     except Exception as e:
         logger.warning(f"autopilot: publish copy failed, keeping the video: {e}")
 
+    try:
+        affiliate_link = product_library.read_product_link(subject)
+    except Exception as e:
+        logger.warning(f"autopilot: product link lookup failed: {e}")
+        affiliate_link = ""
     report = format_report(
         product,
         videos,
         metadata,
         pinned,
         ready_videos=(result or {}).get("tiktok_ready_videos") or [],
+        affiliate_link=affiliate_link,
     )
     report_path = os.path.join(utils.task_dir(task_id), REPORT_FILENAME)
     try:

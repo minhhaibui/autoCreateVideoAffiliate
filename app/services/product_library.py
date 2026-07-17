@@ -28,6 +28,7 @@ MEDIA_EXTENSIONS = ("jpg", "jpeg", "png", "mp4", "mov")
 # appear in the product name (folder names are the shorter, curated side).
 MIN_MATCH_RATIO = 0.6
 GUIDE_FILENAME = "HUONG-DAN.txt"
+LINK_FILENAME = "link.txt"
 GUIDE_TEXT = """Thư mục THƯ VIỆN SẢN PHẨM (tự động dùng cho video)
 
 Cách dùng:
@@ -36,7 +37,10 @@ Cách dùng:
      may xay sinh to/
 2. Thả ảnh/video thật của sản phẩm vào thư mục đó (jpg, png, mp4, mov).
    Nên dùng 2-4 ảnh đẹp nhất từ trang shop (ảnh có người dùng càng tốt).
-3. Xong! Khi Autopilot (hoặc bạn) làm video cho sản phẩm có tên khớp,
+3. (Nên làm) Tạo thêm file link.txt trong thư mục đó, dán link affiliate
+   THẬT của sản phẩm vào dòng đầu tiên. Autopilot sẽ tự đưa link này vào
+   báo cáo + comment ghim — không phải dán tay mỗi lần đăng nữa.
+4. Xong! Khi Autopilot (hoặc bạn) làm video cho sản phẩm có tên khớp,
    ảnh sẽ tự xuất hiện: mở đầu video + rải đều giữa các cảnh quay.
 
 Lưu ý: ảnh phải rộng/cao tối thiểu 480px; tên thư mục khớp theo từ
@@ -108,6 +112,31 @@ def find_product_folder(product_name: str) -> str:
     ]
     matched = match_folder(product_name, folders)
     return os.path.join(root, matched) if matched else ""
+
+
+def read_product_link(product_name: str) -> str:
+    """The user's REAL affiliate link for this product, from the matched
+    library folder's link.txt (first non-empty line), or "".
+
+    The link is always user-authored and passed through verbatim — the
+    honesty rule stands: the app never invents links, it only relays one
+    the user saved. Returns "" on no folder / no file / empty file.
+    """
+    folder = find_product_folder(product_name)
+    if not folder:
+        return ""
+    link_path = os.path.join(folder, LINK_FILENAME)
+    if not os.path.isfile(link_path):
+        return ""
+    try:
+        with open(link_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    return line
+    except OSError as e:
+        logger.warning(f"product library: could not read {link_path}: {e}")
+    return ""
 
 
 def stage_product_media(product_name: str) -> list:

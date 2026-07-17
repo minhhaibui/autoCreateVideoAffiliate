@@ -85,12 +85,21 @@ Ngoài việc tạo video, WebUI còn có một bộ công cụ giúp **bán hà
 - **Một chạm đổ vào hàng loạt** — gửi thẳng danh sách ý tưởng sản phẩm hoặc lịch nội dung tuần sang ô hàng loạt, không cần gõ lại.
 - **Export Copy** — gom toàn bộ nội dung đã tạo (kịch bản, hook, campaign, caption, lịch đăng…) thành một file `.txt` để dùng lại.
 
+**📸 Sản phẩm thật xuất hiện trong video**
+- **Ô "Ảnh/video sản phẩm thật"** (tab ③, ngay dưới nguồn video): thả 2-4 ảnh thật của sản phẩm (ví dụ ảnh người mẫu mặc bộ đồ lấy từ trang shop) — video sẽ **mở đầu bằng sản phẩm** và rải đều nó giữa các cảnh quay stock, người xem thấy tận mắt món bạn bán. Ảnh tĩnh tự thành clip có hiệu ứng zoom. Thiếu key nguồn video vẫn render được (video 100% từ ảnh sản phẩm).
+- **Thư viện sản phẩm — thả ảnh MỘT lần, dùng mãi mãi**: tạo thư mục con trong `storage/product_library/` cho mỗi sản phẩm (tên không cần dấu, ví dụ `noi chien khong dau/`) rồi thả ảnh vào. Từ đó, mọi video về sản phẩm có tên khớp — bạn bấm Generate, chạy batch hay **Autopilot tự chọn** — đều tự dùng ảnh đó, không phải upload lại. Có file `HUONG-DAN.txt` ngay trong thư mục.
+- **`link.txt` — hết dán link thủ công**: trong thư mục sản phẩm, tạo thêm `link.txt` chứa link affiliate THẬT (dòng đầu tiên). Báo cáo autopilot sẽ in sẵn link cạnh comment ghim — copy nguyên khối là đăng. App vẫn giữ quy tắc: chỉ chuyển tiếp link bạn lưu, không bao giờ tự bịa.
+
+**📦 File sẵn-đăng sau mỗi lần render**
+- Video render gốc rất nặng (~66MB/36s) trong khi upload TikTok web giới hạn 10MB. Giờ **mỗi lần render app tự xuất thêm `final-1-tiktok.mp4` dưới 10MB** — hết cảnh nén tay bằng ffmpeg trước mỗi lần đăng. Báo cáo autopilot chỉ rõ file nào là bản để upload.
+
 **🤖 Autopilot — tự sản xuất video theo lịch**
 - Chạy `python autopilot.py` (hoặc đặt cron) là app **tự lo trọn một chu trình**: sinh một loạt ý tưởng trong ngách của kênh → AI chấm điểm chọn sản phẩm hứa hẹn nhất (ưu tiên giá dễ chốt, minh họa được bằng video stock) → tránh lặp sản phẩm đã làm gần đây → render video → tạo sẵn caption + comment ghim → ghi tất cả vào báo cáo `autopilot_report.txt` cạnh video.
 - **Tự vượt giới hạn quota miễn phí**: chạy không người trông nên autopilot tự giãn nhịp giữa các lần gọi AI, và khi model chính cạn quota ngày sẽ **tự chuyển sang model dự phòng** (mặc định `gemini-2.5-flash-lite`, đổi bằng khóa `autopilot_fallback_model` trong `config.toml [app]`) — kể cả thử render lại một lần nếu quota cạn giữa chừng. File cấu hình trên đĩa không bao giờ bị sửa.
 - **Panel Autopilot trong WebUI** — xem các lần chạy gần nhất và tải báo cáo mới nhất ngay trong giao diện, không cần mở terminal.
 - Ví dụ cron chạy 9:00 và 21:00 hằng ngày (máy phải đang thức): `0 9,21 * * * cd /duong-dan/MoneyPrinterTurbo && .venv/bin/python autopilot.py >> storage/autopilot/cron.log 2>&1`
-- Như mọi tính năng khác: autopilot **không bao giờ bịa link affiliate** — báo cáo luôn nhắc bạn tự thêm link thật trước khi đăng.
+- Autopilot giờ **tự lấy ảnh sản phẩm thật + link affiliate** từ Thư viện sản phẩm (mục 📸 phía trên) khi nó chọn trúng sản phẩm bạn đã chuẩn bị thư mục — chu trình gần như không cần bàn tay người.
+- Như mọi tính năng khác: autopilot **không bao giờ bịa link affiliate** — không có `link.txt` thì báo cáo luôn nhắc bạn tự thêm link thật trước khi đăng.
 
 > Giao diện được tổ chức thành 3 bước: ① Sản phẩm & Kịch bản → ② Copy & Tài sản → ③ Video & Phụ đề. Hỗ trợ đa ngôn ngữ (Việt / English / Русский).
 

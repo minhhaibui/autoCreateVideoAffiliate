@@ -128,6 +128,84 @@ class TestStageProductMedia(unittest.TestCase):
         self.assertIn("lib-noi chien khong dau-a.jpg", materials[0].url)
 
 
+class TestReadProductLink(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.library = os.path.join(self.tmp.name, "product_library")
+
+        def fake_storage_dir(sub_dir="", create=False):
+            d = os.path.join(self.tmp.name, sub_dir) if sub_dir else self.tmp.name
+            if create and not os.path.exists(d):
+                os.makedirs(d)
+            return d
+
+        patcher = patch.object(
+            product_library.utils, "storage_dir", side_effect=fake_storage_dir
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def seed_link(self, folder, content):
+        d = os.path.join(self.library, folder)
+        os.makedirs(d, exist_ok=True)
+        with open(
+            os.path.join(d, product_library.LINK_FILENAME), "w", encoding="utf-8"
+        ) as f:
+            f.write(content)
+
+    def test_first_nonempty_line_is_returned_stripped(self):
+        self.seed_link(
+            "noi chien khong dau", "\n  https://vt.tiktok.com/ZS123abc/  \nghi chú\n"
+        )
+        self.assertEqual(
+            product_library.read_product_link("Nồi chiên không dầu 5L"),
+            "https://vt.tiktok.com/ZS123abc/",
+        )
+
+    def test_missing_link_file_returns_empty(self):
+        os.makedirs(os.path.join(self.library, "noi chien khong dau"))
+        self.assertEqual(
+            product_library.read_product_link("nồi chiên không dầu"), ""
+        )
+
+    def test_no_matching_folder_returns_empty(self):
+        self.assertEqual(product_library.read_product_link("Áo thun"), "")
+
+    def test_empty_file_returns_empty(self):
+        self.seed_link("noi chien khong dau", "\n\n")
+        self.assertEqual(
+            product_library.read_product_link("nồi chiên không dầu"), ""
+        )
+
+
+class TestReportAffiliateLink(unittest.TestCase):
+    def test_report_carries_library_link_and_drops_manual_note(self):
+        from app.services import autopilot
+
+        report = autopilot.format_report(
+            {"product": "Nồi chiên"},
+            ["/t/final-1.mp4"],
+            {},
+            [{"comment": "Link ở đây nha 👆"}],
+            affiliate_link="https://vt.tiktok.com/ZS123abc/",
+        )
+        self.assertIn(
+            "Affiliate link (from your product library): https://vt.tiktok.com/ZS123abc/",
+            report,
+        )
+        self.assertNotIn("never invents links", report)
+
+    def test_report_without_link_keeps_manual_note(self):
+        from app.services import autopilot
+
+        report = autopilot.format_report(
+            {"product": "Nồi chiên"}, ["/t/final-1.mp4"], {}, []
+        )
+        self.assertIn("never invents links", report)
+        self.assertNotIn("Affiliate link", report)
+
+
 class TestTaskLibraryFallback(unittest.TestCase):
     def test_task_uses_library_when_no_manual_product_media(self):
         from app.models.schema import MaterialInfo, VideoParams
