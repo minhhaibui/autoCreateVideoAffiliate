@@ -3,7 +3,6 @@ import sys
 import webbrowser
 from uuid import UUID, uuid4
 
-import requests
 import streamlit as st
 from loguru import logger
 
@@ -44,6 +43,7 @@ from app.services.campaign import (
 from app.services.fonts import get_recommended_font
 from app.services.preflight import is_llm_ready
 from app.services.preview import render_subtitle_preview
+from app.services.providers import fetch_groq_model_ids
 from app.services.onboarding import (
     apply_new_video_reset,
     example_prefill,
@@ -498,33 +498,9 @@ def render_detail_fields(item, fields):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_groq_model_ids(api_key: str, base_url: str) -> list[str]:
-    if not api_key:
-        return []
-
-    normalized_base_url = (base_url or "https://api.groq.com/openai/v1").strip().rstrip("/")
-    models_url = f"{normalized_base_url}/models"
-
-    try:
-        response = requests.get(
-            models_url,
-            headers={"Authorization": f"Bearer {api_key}"},
-            timeout=10,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        data = payload.get("data", [])
-
-        model_ids = []
-        for item in data:
-            if isinstance(item, dict):
-                model_id = item.get("id")
-                if isinstance(model_id, str) and model_id.strip():
-                    model_ids.append(model_id.strip())
-
-        return sorted(set(model_ids))
-    except Exception as e:
-        logger.warning(f"failed to fetch groq models: {e}")
-        return []
+    # Thin cached wrapper — the fetch/normalize logic lives (and is tested)
+    # in app.services.providers.fetch_groq_model_ids.
+    return fetch_groq_model_ids(api_key, base_url)
 
 # 创建基础设置折叠框
 # Auto-open when the LLM key is missing: the mandatory API key lives in here, so
