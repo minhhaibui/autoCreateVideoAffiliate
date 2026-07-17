@@ -2021,6 +2021,34 @@ class TestGenerateTerms(unittest.TestCase):
         self.assertEqual(terms, [])
 
 
+class TestGenerateKeyedList(unittest.TestCase):
+    """End-to-end through the shared list runner: parse → coerce → cap."""
+
+    def run_helper(self, response, amount=2):
+        with patch.object(llm, "_generate_response", return_value=response):
+            return llm._generate_keyed_list(
+                "prompt", ("a", "b"), ("a",), 50, "unit test", amount
+            )
+
+    def test_keeps_only_declared_keys_and_caps_at_amount(self):
+        response = json.dumps(
+            [
+                {"a": "one", "b": "x", "extra": "dropped"},
+                {"a": "two", "b": "y"},
+                {"a": "three", "b": "z"},
+            ]
+        )
+        items = self.run_helper(response, amount=2)
+        self.assertEqual(
+            items, [{"a": "one", "b": "x"}, {"a": "two", "b": "y"}]
+        )
+
+    def test_items_missing_a_required_key_are_dropped(self):
+        response = json.dumps([{"b": "no a here"}, {"a": "kept", "b": ""}])
+        items = self.run_helper(response)
+        self.assertEqual(items, [{"a": "kept", "b": ""}])
+
+
 class TestLanguageLine(unittest.TestCase):
     """_language_line must reproduce the exact wording the 13 generators used
     before it was factored out — the prompts must not drift."""

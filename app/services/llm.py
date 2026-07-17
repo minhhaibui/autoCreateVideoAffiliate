@@ -1075,6 +1075,21 @@ def _coerce_keyed_dict(item, keys, required_keys, max_length: int) -> dict:
     return out
 
 
+def _generate_keyed_list(
+    prompt: str, keys, required_keys, max_length: int, label: str, amount: int
+) -> List[dict]:
+    """Run the JSON-array generation + per-item coercion + count cap shared by
+    every affiliate list generator: parse the LLM response as a list of dicts,
+    keep only ``keys`` (each clamped to ``max_length``), drop items missing a
+    ``required_keys`` value, and return at most ``amount`` items."""
+    items = _generate_json_object_list(
+        prompt,
+        lambda item: _coerce_keyed_dict(item, keys, required_keys, max_length),
+        label,
+    )
+    return items[:amount]
+
+
 def _language_line(keys, language: str, fallback_source: str = "the subject") -> str:
     """Build the shared prompt constraint that pins the output language.
 
@@ -1398,12 +1413,9 @@ Suggest {amount} product ideas that tend to sell well for TikTok affiliate marke
         f"generating product ideas: category={category!r}, market={market!r}, amount={amount}"
     )
 
-    ideas = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, PRODUCT_IDEA_KEYS, ("product",), MAX_PRODUCT_FIELD_LENGTH),
-        "product ideas",
+    return _generate_keyed_list(
+        prompt, PRODUCT_IDEA_KEYS, ("product",), MAX_PRODUCT_FIELD_LENGTH, "product ideas", amount
     )
-    return ideas[:amount]
 
 
 RANKING_KEYS = ("product", "why")
@@ -1476,12 +1488,9 @@ Rank the candidate products below by how likely a short TikTok AFFILIATE video w
         f"language={language!r}"
     )
 
-    ranked = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, RANKING_KEYS, ("product",), MAX_PRODUCT_FIELD_LENGTH),
-        "product ranking",
+    return _generate_keyed_list(
+        prompt, RANKING_KEYS, ("product",), MAX_PRODUCT_FIELD_LENGTH, "product ranking", len(ideas)
     )
-    return ranked[: len(ideas)]
 
 
 # =============================================================================
@@ -1678,12 +1687,9 @@ Turn a short affiliate video about "{video_subject}" into a clear shot-by-shot s
         f"has_script={bool(video_script)}, language={language!r}"
     )
 
-    shots = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, SHOT_KEYS, ("scene",), MAX_SHOT_FIELD_LENGTH),
-        "shots",
+    return _generate_keyed_list(
+        prompt, SHOT_KEYS, ("scene",), MAX_SHOT_FIELD_LENGTH, "shots", amount
     )
-    return shots[:amount]
 
 
 # =============================================================================
@@ -1750,12 +1756,9 @@ Predict {amount} of the most common comments viewers leave on a short affiliate 
         f"language={language!r}"
     )
 
-    replies = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, COMMENT_REPLY_KEYS, ("comment", "reply"), MAX_COMMENT_REPLY_FIELD_LENGTH),
-        "comment replies",
+    return _generate_keyed_list(
+        prompt, COMMENT_REPLY_KEYS, ("comment", "reply"), MAX_COMMENT_REPLY_FIELD_LENGTH, "comment replies", amount
     )
-    return replies[:amount]
 
 
 # =============================================================================
@@ -1824,12 +1827,9 @@ Suggest {amount} sound / music styles that would fit a short affiliate video abo
         f"language={language!r}"
     )
 
-    ideas = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, SOUND_KEYS, ("sound",), MAX_SOUND_FIELD_LENGTH),
-        "sound ideas",
+    return _generate_keyed_list(
+        prompt, SOUND_KEYS, ("sound",), MAX_SOUND_FIELD_LENGTH, "sound ideas", amount
     )
-    return ideas[:amount]
 
 
 DEFAULT_STICKER_COUNT = 5
@@ -1890,12 +1890,9 @@ Write {amount} short on-screen text stickers (captions the creator overlays on t
         f"language={language!r}"
     )
 
-    stickers = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, STICKER_KEYS, ("text",), MAX_STICKER_FIELD_LENGTH),
-        "text stickers",
+    return _generate_keyed_list(
+        prompt, STICKER_KEYS, ("text",), MAX_STICKER_FIELD_LENGTH, "text stickers", amount
     )
-    return stickers[:amount]
 
 
 DEFAULT_COVER_COUNT = 4
@@ -1957,12 +1954,9 @@ Write {amount} cover (thumbnail) headline options for a short affiliate video ab
         f"language={language!r}"
     )
 
-    ideas = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, COVER_KEYS, ("text",), MAX_COVER_FIELD_LENGTH),
-        "cover text ideas",
+    return _generate_keyed_list(
+        prompt, COVER_KEYS, ("text",), MAX_COVER_FIELD_LENGTH, "cover text ideas", amount
     )
-    return ideas[:amount]
 
 
 DEFAULT_SCHEDULE_COUNT = 4
@@ -2033,12 +2027,9 @@ Suggest {amount} best-practice posting time windows for a short affiliate video 
         f"region={audience_region!r}, language={language!r}"
     )
 
-    slots = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, SCHEDULE_KEYS, ("time",), MAX_SCHEDULE_FIELD_LENGTH),
-        "posting schedule",
+    return _generate_keyed_list(
+        prompt, SCHEDULE_KEYS, ("time",), MAX_SCHEDULE_FIELD_LENGTH, "posting schedule", amount
     )
-    return slots[:amount]
 
 
 DEFAULT_PINNED_COMMENT_COUNT = 4
@@ -2102,12 +2093,9 @@ Write {amount} options for the creator's OWN first comment to pin to the top of 
         f"language={language!r}"
     )
 
-    pinned = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, PINNED_COMMENT_KEYS, ("comment",), MAX_PINNED_COMMENT_FIELD_LENGTH),
-        "pinned comments",
+    return _generate_keyed_list(
+        prompt, PINNED_COMMENT_KEYS, ("comment",), MAX_PINNED_COMMENT_FIELD_LENGTH, "pinned comments", amount
     )
-    return pinned[:amount]
 
 
 DEFAULT_DISCLOSURE_COUNT = 3
@@ -2170,12 +2158,9 @@ Write {amount} ready-to-use affiliate / paid-partnership DISCLOSURE options for 
         f"language={language!r}"
     )
 
-    lines = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, DISCLOSURE_KEYS, ("line",), MAX_DISCLOSURE_FIELD_LENGTH),
-        "disclosure lines",
+    return _generate_keyed_list(
+        prompt, DISCLOSURE_KEYS, ("line",), MAX_DISCLOSURE_FIELD_LENGTH, "disclosure lines", amount
     )
-    return lines[:amount]
 
 
 DEFAULT_SAVE_BAIT_COUNT = 4
@@ -2241,12 +2226,9 @@ Write {amount} short calls that make a viewer want to SAVE or SHARE a short affi
         f"language={language!r}"
     )
 
-    prompts = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, SAVE_BAIT_KEYS, ("line",), MAX_SAVE_BAIT_FIELD_LENGTH),
-        "save/share prompts",
+    return _generate_keyed_list(
+        prompt, SAVE_BAIT_KEYS, ("line",), MAX_SAVE_BAIT_FIELD_LENGTH, "save/share prompts", amount
     )
-    return prompts[:amount]
 
 
 DEFAULT_BUYER_QA_COUNT = 5
@@ -2313,14 +2295,9 @@ A creator is about to publish a short affiliate video about "{video_subject}". P
         f"language={language!r}"
     )
 
-    qa = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(
-            x, BUYER_QA_KEYS, ("question", "reply"), MAX_BUYER_QA_FIELD_LENGTH
-        ),
-        "buyer q&a",
+    return _generate_keyed_list(
+        prompt, BUYER_QA_KEYS, ("question", "reply"), MAX_BUYER_QA_FIELD_LENGTH, "buyer q&a", amount
     )
-    return qa[:amount]
 
 
 DEFAULT_PERFORMANCE_INSIGHT_COUNT = 4
@@ -2394,12 +2371,9 @@ The creator pasted the stats of their OWN recent affiliate videos below (one vid
         f"amount={amount}, language={language!r}"
     )
 
-    insights = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, PERFORMANCE_KEYS, ("insight",), MAX_PERFORMANCE_FIELD_LENGTH),
-        "performance review",
+    return _generate_keyed_list(
+        prompt, PERFORMANCE_KEYS, ("insight",), MAX_PERFORMANCE_FIELD_LENGTH, "performance review", amount
     )
-    return insights[:amount]
 
 
 DEFAULT_COMPETITOR_INSIGHT_COUNT = 4
@@ -2482,12 +2456,9 @@ The creator pasted competitor content they collected below (competitor hooks, ca
         f"product={product!r}, amount={amount}, language={language!r}"
     )
 
-    patterns = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, COMPETITOR_KEYS, ("pattern",), MAX_COMPETITOR_FIELD_LENGTH),
-        "competitor analysis",
+    return _generate_keyed_list(
+        prompt, COMPETITOR_KEYS, ("pattern",), MAX_COMPETITOR_FIELD_LENGTH, "competitor analysis", amount
     )
-    return patterns[:amount]
 
 
 DEFAULT_CALENDAR_DAY_COUNT = 7
@@ -2554,12 +2525,9 @@ Plan {amount} consecutive days of short-video subjects for ONE TikTok affiliate 
         f"language={language!r}"
     )
 
-    days = _generate_json_object_list(
-        prompt,
-        lambda x: _coerce_keyed_dict(x, CALENDAR_KEYS, ("subject",), MAX_CALENDAR_FIELD_LENGTH),
-        "content calendar",
+    return _generate_keyed_list(
+        prompt, CALENDAR_KEYS, ("subject",), MAX_CALENDAR_FIELD_LENGTH, "content calendar", amount
     )
-    return days[:amount]
 
 
 if __name__ == "__main__":
