@@ -148,6 +148,15 @@ def load_config():
 
 
 def save_config():
+    # Keep one rolling backup of the previous on-disk config BEFORE
+    # overwriting. config.toml is gitignored, so a bad in-memory state being
+    # persisted (e.g. a test blanking API keys — it happened, and a Pexels key
+    # was unrecoverable) would otherwise destroy the only copy.
+    try:
+        if os.path.isfile(config_file):
+            shutil.copyfile(config_file, config_file + ".bak")
+    except Exception as e:
+        logger.warning(f"failed to write config backup before save: {e}")
     with open(config_file, "w", encoding="utf-8") as f:
         _cfg["app"] = app
         _cfg["azure"] = azure
